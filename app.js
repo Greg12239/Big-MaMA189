@@ -25,6 +25,8 @@ const locationMapFallback = document.querySelector("[data-map-fallback]");
 let activeOrderChooser = null;
 
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const mobileViewportQuery = window.matchMedia("(max-width: 900px)");
+const isMobileViewport = () => mobileViewportQuery.matches;
 const menuTitleSwitchDuration = prefersReducedMotion ? 0 : 260;
 const menuPanelSwitchDuration = prefersReducedMotion ? 0 : 380;
 const menuPanelEntryDuration = prefersReducedMotion ? 0 : 680;
@@ -36,6 +38,7 @@ const menuRailMaximumVelocity = 2.5;
 const menuRailInertiaFriction = 0.009;
 const menuRailInertiaStopVelocity = 0.03;
 const menuRailWheelSettleDelay = 110;
+const menuRailNativeTouchSettleDelay = 180;
 const loaderExitDelay = prefersReducedMotion ? 140 : 1500;
 const loaderExitDuration = prefersReducedMotion ? 160 : 760;
 const loaderFailSafeDelay = prefersReducedMotion ? 900 : 3600;
@@ -152,7 +155,7 @@ function updateScrollUI() {
 
   progress.style.width = `${progressWidth}%`;
   header?.classList.toggle("is-scrolled", window.scrollY > 24);
-  if (!prefersReducedMotion) {
+  if (!prefersReducedMotion && !isMobileViewport()) {
     parallaxItems.forEach((item) => {
       const depth = Number(item.dataset.parallax || 0);
       item.style.transform = `translate3d(0, ${window.scrollY * depth * -0.12}px, 0)`;
@@ -359,7 +362,7 @@ function headerAwareProductOffset() {
 }
 
 function snapProductIntoView(card) {
-  if (!card?.isConnected) return;
+  if (isMobileViewport() || !card?.isConnected) return;
 
   const cardRect = card.getBoundingClientRect();
   const targetOffset = headerAwareProductOffset();
@@ -399,6 +402,7 @@ function snapProductIntoView(card) {
 }
 
 menuOrderRoot?.addEventListener("pointerdown", (event) => {
+  if (isMobileViewport()) return;
   if (event.isPrimary === false || (event.pointerType === "mouse" && event.button !== 0)) return;
   if (isProductInteractiveTarget(event.target)) return;
 
@@ -425,6 +429,7 @@ menuOrderRoot?.addEventListener("pointermove", (event) => {
 menuOrderRoot?.addEventListener("pointerup", (event) => {
   const state = productTapState;
   productTapState = null;
+  if (isMobileViewport()) return;
   if (!state || state.pointerId !== event.pointerId || state.moved || isProductInteractiveTarget(event.target)) return;
 
   const card = event.target instanceof Element ? event.target.closest(".menu-card") : null;
@@ -462,6 +467,7 @@ class MenuCategoryController {
       phase: "idle",
       frame: 0,
       wheelTimer: 0,
+      nativeTouchTimer: 0,
       pointerId: null,
       pointerType: "",
       pointerIntent: null,
@@ -484,6 +490,8 @@ class MenuCategoryController {
       targetScrollLeft: 0,
       generation: 0,
       suppressClick: false,
+      nativeTouchActive: false,
+      nativeTouchMoved: false,
     };
     this.titleTimer = null;
     this.titleRequest = 0;
@@ -503,11 +511,12 @@ class MenuCategoryController {
     this.observeMenuEntrance();
     this.updateBurgerOptions();
     this.setBurgerPopoverInteractivity(false);
-    Object.values(menuTitleAssets).forEach((title) => preloadMenuTitle(title.src));
+    if (!isMobileViewport()) Object.values(menuTitleAssets).forEach((title) => preloadMenuTitle(title.src));
     this.updateTitle({ immediate: true });
     this.updateStatus();
 
     const alignInitialCategoryRail = () => {
+      if (isMobileViewport()) return;
       window.requestAnimationFrame(() => {
         this.refreshCategoryRailMetrics();
         this.moveCategoryRail(this.tabs.find((tab) => tab.dataset.menuTab === this.activeTop), "neutral", { immediate: true });
@@ -520,17 +529,21 @@ class MenuCategoryController {
     this.tabs.forEach((tab) => {
       tab.addEventListener("click", () => this.handleTabClick(tab));
       tab.addEventListener("keydown", (event) => this.handleTabKeydown(event, tab));
-      ["pointerenter", "focusin", "pointerdown"].forEach((eventName) => {
-        tab.addEventListener(eventName, () => this.prewarmTopCategory(tab.dataset.menuTab), { passive: true });
-      });
+      if (!isMobileViewport()) {
+        ["pointerenter", "focusin", "pointerdown"].forEach((eventName) => {
+          tab.addEventListener(eventName, () => this.prewarmTopCategory(tab.dataset.menuTab), { passive: true });
+        });
+      }
     });
 
     burgerOptions.forEach((option) => {
       option.addEventListener("click", () => this.selectBurgerSubcategory(option.dataset.burgerSubcategory));
       option.addEventListener("keydown", (event) => this.handleBurgerOptionKeydown(event, option));
-      ["pointerenter", "focusin", "pointerdown"].forEach((eventName) => {
-        option.addEventListener(eventName, () => this.prewarmBurgerSubcategory(option.dataset.burgerSubcategory), { passive: true });
-      });
+      if (!isMobileViewport()) {
+        ["pointerenter", "focusin", "pointerdown"].forEach((eventName) => {
+          option.addEventListener(eventName, () => this.prewarmBurgerSubcategory(option.dataset.burgerSubcategory), { passive: true });
+        });
+      }
     });
 
     burgerPopover?.addEventListener("transitionend", (event) => this.handleBurgerPopoverTransitionEnd(event));
@@ -547,14 +560,19 @@ class MenuCategoryController {
       this.closeBurgerPopover({ restoreFocus: true });
     });
 
-    menuCategorySwitcher?.addEventListener("scroll", () => this.handleCategoryRailScroll(), { passive: true });
-    menuCategorySwitcher?.addEventListener("pointerdown", (event) => this.handleCategoryRailPointerDown(event));
-    menuCategorySwitcher?.addEventListener("pointermove", (event) => this.handleCategoryRailPointerMove(event), { passive: false });
-    menuCategorySwitcher?.addEventListener("pointerup", (event) => this.handleCategoryRailPointerEnd(event));
-    menuCategorySwitcher?.addEventListener("pointercancel", (event) => this.cancelCategoryRailPointer(event));
-    menuCategorySwitcher?.addEventListener("lostpointercapture", (event) => this.cancelCategoryRailPointer(event));
-    menuCategorySwitcher?.addEventListener("click", (event) => this.handleCategoryRailClick(event), true);
-    menuCategorySwitcher?.addEventListener("wheel", (event) => this.handleCategoryRailWheel(event), { passive: false });
+    if (!isMobileViewport()) {
+      menuCategorySwitcher?.addEventListener("scroll", () => this.handleCategoryRailScroll(), { passive: true });
+      menuCategorySwitcher?.addEventListener("scrollend", () => this.handleCategoryRailScrollEnd(), { passive: true });
+      menuCategorySwitcher?.addEventListener("pointerdown", (event) => this.handleCategoryRailPointerDown(event));
+      menuCategorySwitcher?.addEventListener("pointermove", (event) => this.handleCategoryRailPointerMove(event), { passive: false });
+      menuCategorySwitcher?.addEventListener("pointerup", (event) => this.handleCategoryRailPointerEnd(event));
+      menuCategorySwitcher?.addEventListener("pointercancel", (event) => this.cancelCategoryRailPointer(event));
+      menuCategorySwitcher?.addEventListener("lostpointercapture", (event) => this.cancelCategoryRailPointer(event));
+      menuCategorySwitcher?.addEventListener("touchend", () => this.completeNativeTouchGesture(), { passive: true });
+      menuCategorySwitcher?.addEventListener("touchcancel", () => this.completeNativeTouchGesture(), { passive: true });
+      menuCategorySwitcher?.addEventListener("click", (event) => this.handleCategoryRailClick(event), true);
+      menuCategorySwitcher?.addEventListener("wheel", (event) => this.handleCategoryRailWheel(event), { passive: false });
+    }
     window.addEventListener("resize", () => {
       this.cancelCategoryRailMotion();
       this.refreshCategoryRailMetrics();
@@ -652,6 +670,10 @@ class MenuCategoryController {
       this.menuEntranceObserver?.disconnect();
       this.menuEntranceObserver = null;
       const activePanel = this.panels.find((panel) => panel.dataset.menuPanel === this.activeTop);
+      if (isMobileViewport()) {
+        if (!this.transition && activePanel?.dataset.menuPanel === this.activeTop) setMenuCardsVisible(activePanel, { immediate: true });
+        return;
+      }
       this.waitForPanelImages(activePanel).finally(() => {
         if (!this.transition && activePanel?.dataset.menuPanel === this.activeTop) setMenuCardsVisible(activePanel, { immediate: prefersReducedMotion });
       });
@@ -712,15 +734,18 @@ class MenuCategoryController {
   }
 
   waitForPanelImages(panel, { prewarm = false } = {}) {
+    if (isMobileViewport()) return Promise.resolve();
     return Promise.all(this.imagesForPanel(panel).map((image) => this.getMenuImageReadiness(image, { prewarm })));
   }
 
   prewarmTopCategory(key) {
+    if (isMobileViewport()) return;
     const panel = this.panels.find((item) => item.dataset.menuPanel === key);
     if (panel) this.waitForPanelImages(panel, { prewarm: true });
   }
 
   prewarmBurgerSubcategory(key) {
+    if (isMobileViewport()) return;
     const panel = this.burgerPanels.find((item) => item.dataset.burgerPanel === key);
     if (panel) this.waitForPanelImages(panel, { prewarm: true });
   }
@@ -832,7 +857,7 @@ class MenuCategoryController {
   }
 
   refreshCategoryRailMetrics() {
-    if (!menuCategorySwitcher) return;
+    if (isMobileViewport() || !menuCategorySwitcher) return;
 
     const state = this.railState;
     state.maxScrollLeft = Math.max(0, menuCategorySwitcher.scrollWidth - menuCategorySwitcher.clientWidth);
@@ -886,7 +911,7 @@ class MenuCategoryController {
   }
 
   writeCategoryRailScroll(value) {
-    if (!menuCategorySwitcher) return 0;
+    if (isMobileViewport() || !menuCategorySwitcher) return 0;
 
     const next = this.clampCategoryRailScroll(value);
     menuCategorySwitcher.scrollLeft = next;
@@ -922,12 +947,16 @@ class MenuCategoryController {
     this.clearCategoryRailFrame();
     window.clearTimeout(state.wheelTimer);
     state.wheelTimer = 0;
+    window.clearTimeout(state.nativeTouchTimer);
+    state.nativeTouchTimer = 0;
     state.phase = "idle";
     state.velocity = 0;
     state.pendingWheelDelta = 0;
     state.lastFrameAt = 0;
     state.targetCategory = null;
     state.targetScrollLeft = 0;
+    state.nativeTouchActive = false;
+    state.nativeTouchMoved = false;
     this.releaseCategoryRailPointer();
     this.clearRailFocusedCategory();
     menuCategorySwitcher?.classList.remove("is-rail-dragging");
@@ -989,12 +1018,29 @@ class MenuCategoryController {
   }
 
   handleCategoryRailPointerDown(event) {
+    if (isMobileViewport()) return;
     if (!this.hasCategoryRailOverflow()) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
     if (event.isPrimary === false) return;
 
     this.cancelCategoryRailMotion();
     const state = this.railState;
+    if (event.pointerType === "touch") {
+      state.phase = "native-touch";
+      state.pointerId = event.pointerId;
+      state.pointerType = event.pointerType;
+      state.pointerIntent = null;
+      state.startX = event.clientX;
+      state.startY = event.clientY;
+      state.latestX = event.clientX;
+      state.latestY = event.clientY;
+      state.startScrollLeft = menuCategorySwitcher?.scrollLeft || 0;
+      state.nativeTouchActive = true;
+      state.nativeTouchMoved = false;
+      this.closeBurgerPopover();
+      return;
+    }
+
     state.phase = "pending";
     state.pointerId = event.pointerId;
     state.pointerType = event.pointerType || "";
@@ -1010,8 +1056,11 @@ class MenuCategoryController {
   }
 
   handleCategoryRailPointerMove(event) {
+    if (isMobileViewport()) return;
     const state = this.railState;
     if (event.pointerId !== state.pointerId || !menuCategorySwitcher) return;
+    if (state.phase === "native-touch") return;
+
     state.latestX = event.clientX;
     state.latestY = event.clientY;
     if (state.pointerIntent === "vertical") return;
@@ -1046,8 +1095,14 @@ class MenuCategoryController {
   }
 
   handleCategoryRailPointerEnd(event) {
+    if (isMobileViewport()) return;
     const state = this.railState;
     if (event.pointerId !== state.pointerId) return;
+
+    if (state.phase === "native-touch") {
+      this.completeNativeTouchGesture();
+      return;
+    }
 
     if (state.phase === "dragging") {
       event.preventDefault();
@@ -1062,12 +1117,19 @@ class MenuCategoryController {
   }
 
   cancelCategoryRailPointer(event) {
+    if (isMobileViewport()) return;
     const state = this.railState;
     if (event.pointerId !== state.pointerId) return;
     if (event.type === "lostpointercapture" && state.pointerType === "touch") return;
 
     const wasDragging = state.phase === "dragging";
+    const wasNativeTouch = state.phase === "native-touch";
     this.releaseCategoryRailPointer();
+    if (wasNativeTouch) {
+      // Native scrolling can cancel pointer events before the finger is released.
+      // touchend/touchcancel owns the actual end-of-contact signal for this path.
+      return;
+    }
     if (wasDragging) {
       this.startCategoryRailSnap({ immediate: prefersReducedMotion });
       return;
@@ -1076,6 +1138,7 @@ class MenuCategoryController {
   }
 
   handleCategoryRailClick(event) {
+    if (isMobileViewport()) return;
     const state = this.railState;
     if (!state.suppressClick || !(event.target instanceof Element) || !event.target.closest(".menu-category-tab")) return;
 
@@ -1099,6 +1162,7 @@ class MenuCategoryController {
   }
 
   handleCategoryRailWheel(event) {
+    if (isMobileViewport()) return;
     if (event.ctrlKey || !this.hasCategoryRailOverflow() || !menuCategorySwitcher) return;
 
     const delta = this.normaliseCategoryRailWheel(event);
@@ -1148,7 +1212,7 @@ class MenuCategoryController {
 
   startCategoryRailInertia() {
     const state = this.railState;
-    if (!menuCategorySwitcher || prefersReducedMotion) {
+    if (isMobileViewport() || !menuCategorySwitcher || prefersReducedMotion) {
       this.startCategoryRailSnap({ immediate: true });
       return;
     }
@@ -1191,7 +1255,7 @@ class MenuCategoryController {
   }
 
   startCategoryRailSnap({ immediate = false } = {}) {
-    if (!menuCategorySwitcher || !this.hasCategoryRailOverflow()) {
+    if (isMobileViewport() || !menuCategorySwitcher || !this.hasCategoryRailOverflow()) {
       this.finishCategoryRailMotion();
       return;
     }
@@ -1240,6 +1304,7 @@ class MenuCategoryController {
   }
 
   moveCategoryRail(tab, direction = "neutral", { immediate = false } = {}) {
+    if (isMobileViewport()) return;
     const anchors = { forward: 0.44, backward: 0.56, neutral: 0.5 };
     const target = menuRailTargetFor(tab, anchors[direction] ?? anchors.neutral);
     if (target === null || !menuCategorySwitcher) return;
@@ -1273,7 +1338,54 @@ class MenuCategoryController {
   }
 
   handleCategoryRailScroll() {
-    if (this.railState.phase === "idle") this.closeWhenBurgerLeavesRail();
+    if (isMobileViewport()) return;
+    const state = this.railState;
+    if (state.phase === "native-touch") {
+      const scrollLeft = menuCategorySwitcher?.scrollLeft || 0;
+      if (Math.abs(scrollLeft - state.startScrollLeft) > 0.01) state.nativeTouchMoved = true;
+      this.updateRailFocusedCategory(scrollLeft);
+      if (!state.nativeTouchActive) this.scheduleNativeTouchSettle();
+      return;
+    }
+    if (state.phase === "idle") this.closeWhenBurgerLeavesRail();
+  }
+
+  handleCategoryRailScrollEnd() {
+    if (isMobileViewport()) return;
+    const state = this.railState;
+    if (state.phase !== "native-touch" || state.nativeTouchActive) return;
+
+    window.clearTimeout(state.nativeTouchTimer);
+    state.nativeTouchTimer = 0;
+    if (state.nativeTouchMoved) this.startCategoryRailSnap({ immediate: prefersReducedMotion });
+    else this.finishCategoryRailMotion();
+  }
+
+  completeNativeTouchGesture() {
+    if (isMobileViewport()) return;
+    const state = this.railState;
+    if (state.phase !== "native-touch") return;
+
+    state.nativeTouchActive = false;
+    if (Math.abs((menuCategorySwitcher?.scrollLeft || 0) - state.startScrollLeft) > 0.01) {
+      state.nativeTouchMoved = true;
+      state.suppressClick = true;
+    }
+    this.releaseCategoryRailPointer();
+    this.scheduleNativeTouchSettle();
+  }
+
+  scheduleNativeTouchSettle() {
+    const state = this.railState;
+    if (state.phase !== "native-touch" || state.nativeTouchActive) return;
+
+    window.clearTimeout(state.nativeTouchTimer);
+    state.nativeTouchTimer = window.setTimeout(() => {
+      state.nativeTouchTimer = 0;
+      if (state.phase !== "native-touch" || state.nativeTouchActive) return;
+      if (state.nativeTouchMoved) this.startCategoryRailSnap({ immediate: prefersReducedMotion });
+      else this.finishCategoryRailMotion();
+    }, menuRailNativeTouchSettleDelay);
   }
 
   clearTopPanelStates(panel) {
@@ -1379,6 +1491,10 @@ class MenuCategoryController {
     if (key === this.activeTop) return;
 
     const request = ++this.generation;
+    if (isMobileViewport()) {
+      this.startTopCategoryTransition(key, nextPanel, request, { railAlreadyAligned });
+      return;
+    }
     this.topPreparation = { key, request, railAlreadyAligned, railTransaction };
     this.waitForPanelImages(nextPanel, { prewarm: true }).finally(() => {
       if (!this.topPreparation || this.topPreparation.request !== request) return;
@@ -1448,10 +1564,10 @@ class MenuCategoryController {
     this.closeBurgerPopover({ restoreFocus: true });
 
     const generation = ++this.burgerGeneration;
-    this.burgerPreparation = { key, generation };
-    this.waitForPanelImages(nextPanel, { prewarm: true }).finally(() => {
-      if (!this.burgerPreparation || this.burgerPreparation.generation !== generation) return;
-      this.burgerPreparation = null;
+    const mobile = isMobileViewport();
+    const commitSelection = () => {
+      if (!mobile && (!this.burgerPreparation || this.burgerPreparation.generation !== generation)) return;
+      if (!mobile) this.burgerPreparation = null;
       if (this.pendingBurger && this.pendingBurger !== key) {
         const latest = this.pendingBurger;
         this.pendingBurger = null;
@@ -1477,7 +1593,15 @@ class MenuCategoryController {
         host: burgerHost,
         generation,
       });
-    });
+    };
+
+    if (mobile) {
+      commitSelection();
+      return;
+    }
+
+    this.burgerPreparation = { key, generation };
+    this.waitForPanelImages(nextPanel, { prewarm: true }).finally(commitSelection);
   }
 
   showPanel(key, { immediate = false } = {}) {
@@ -1572,7 +1696,7 @@ class MenuCategoryController {
       }, menuTitleSwitchDuration);
     };
 
-    if (immediate) {
+    if (immediate || isMobileViewport()) {
       commit();
     } else {
       preloadMenuTitle(title.src).then(commit);
