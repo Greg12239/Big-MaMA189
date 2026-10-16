@@ -27,6 +27,8 @@ let activeOrderChooser = null;
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const mobileViewportQuery = window.matchMedia("(max-width: 900px)");
 const isMobileViewport = () => mobileViewportQuery.matches;
+const nativeCategoryRailViewportQuery = window.matchMedia("(max-width: 1023px)");
+const usesNativeCategoryRail = () => nativeCategoryRailViewportQuery.matches;
 const menuTitleSwitchDuration = prefersReducedMotion ? 0 : 260;
 const menuPanelSwitchDuration = prefersReducedMotion ? 0 : 380;
 const menuPanelEntryDuration = prefersReducedMotion ? 0 : 680;
@@ -477,6 +479,7 @@ class MenuCategoryController {
     this.menuEntranceObserver = null;
     this.railMotion = null;
     this.mobileRailMotion = null;
+    this.nativeRailGesture = null;
     this.railState = {
       phase: "idle",
       frame: 0,
@@ -506,6 +509,8 @@ class MenuCategoryController {
       suppressClick: false,
       nativeTouchActive: false,
       nativeTouchMoved: false,
+      nativeClickTimer: 0,
+      nativeClickSuppression: false,
     };
     this.titleTimer = null;
     this.titleRequest = 0;
@@ -530,9 +535,8 @@ class MenuCategoryController {
     this.updateStatus();
 
     const alignInitialCategoryRail = () => {
-      if (isMobileViewport()) return;
       window.requestAnimationFrame(() => {
-        this.refreshCategoryRailMetrics();
+        if (!usesNativeCategoryRail()) this.refreshCategoryRailMetrics();
         this.moveCategoryRail(this.tabs.find((tab) => tab.dataset.menuTab === this.activeTop), "neutral", { immediate: true });
       });
     };
@@ -574,26 +578,46 @@ class MenuCategoryController {
       this.closeBurgerPopover({ restoreFocus: true });
     });
 
-    if (!isMobileViewport()) {
-      menuCategorySwitcher?.addEventListener("scroll", () => this.handleCategoryRailScroll(), { passive: true });
-      menuCategorySwitcher?.addEventListener("scrollend", () => this.handleCategoryRailScrollEnd(), { passive: true });
-      menuCategorySwitcher?.addEventListener("pointerdown", (event) => this.handleCategoryRailPointerDown(event));
-      menuCategorySwitcher?.addEventListener("pointermove", (event) => this.handleCategoryRailPointerMove(event), { passive: false });
-      menuCategorySwitcher?.addEventListener("pointerup", (event) => this.handleCategoryRailPointerEnd(event));
-      menuCategorySwitcher?.addEventListener("pointercancel", (event) => this.cancelCategoryRailPointer(event));
-      menuCategorySwitcher?.addEventListener("lostpointercapture", (event) => this.cancelCategoryRailPointer(event));
-      menuCategorySwitcher?.addEventListener("touchend", () => this.completeNativeTouchGesture(), { passive: true });
-      menuCategorySwitcher?.addEventListener("touchcancel", () => this.completeNativeTouchGesture(), { passive: true });
-      menuCategorySwitcher?.addEventListener("click", (event) => this.handleCategoryRailClick(event), true);
-      menuCategorySwitcher?.addEventListener("wheel", (event) => this.handleCategoryRailWheel(event), { passive: false });
-    } else {
-      ["pointerdown", "wheel"].forEach((eventName) => {
-        menuCategorySwitcher?.addEventListener(eventName, () => this.cancelMobileCategoryRailMotion(), { passive: true });
-      });
-    }
+    menuCategorySwitcher?.addEventListener("scroll", () => this.handleCategoryRailScroll(), { passive: true });
+    menuCategorySwitcher?.addEventListener("scrollend", () => this.handleCategoryRailScrollEnd(), { passive: true });
+    menuCategorySwitcher?.addEventListener("pointerdown", (event) => {
+      if (usesNativeCategoryRail()) this.handleNativeCategoryRailPointerDown(event);
+      else this.handleCategoryRailPointerDown(event);
+    });
+    menuCategorySwitcher?.addEventListener("pointermove", (event) => {
+      if (usesNativeCategoryRail()) this.handleNativeCategoryRailPointerMove(event);
+      else this.handleCategoryRailPointerMove(event);
+    }, { passive: false });
+    menuCategorySwitcher?.addEventListener("pointerup", (event) => {
+      if (usesNativeCategoryRail()) this.handleNativeCategoryRailPointerEnd(event);
+      else this.handleCategoryRailPointerEnd(event);
+    });
+    menuCategorySwitcher?.addEventListener("pointercancel", (event) => {
+      if (usesNativeCategoryRail()) this.cancelNativeCategoryRailPointer(event);
+      else this.cancelCategoryRailPointer(event);
+    });
+    menuCategorySwitcher?.addEventListener("lostpointercapture", (event) => {
+      if (usesNativeCategoryRail()) this.cancelNativeCategoryRailPointer(event);
+      else this.cancelCategoryRailPointer(event);
+    });
+    menuCategorySwitcher?.addEventListener("touchend", () => {
+      if (!usesNativeCategoryRail()) this.completeNativeTouchGesture();
+    }, { passive: true });
+    menuCategorySwitcher?.addEventListener("touchcancel", () => {
+      if (!usesNativeCategoryRail()) this.completeNativeTouchGesture();
+    }, { passive: true });
+    menuCategorySwitcher?.addEventListener("click", (event) => {
+      if (usesNativeCategoryRail()) this.handleNativeCategoryRailClick(event);
+      else this.handleCategoryRailClick(event);
+    }, true);
+    menuCategorySwitcher?.addEventListener("wheel", (event) => {
+      if (usesNativeCategoryRail()) this.cancelMobileCategoryRailMotion();
+      else this.handleCategoryRailWheel(event);
+    }, { passive: false });
     window.addEventListener("resize", () => {
       this.cancelCategoryRailMotion();
-      this.refreshCategoryRailMetrics();
+      this.cancelMobileCategoryRailMotion();
+      if (!usesNativeCategoryRail()) this.refreshCategoryRailMetrics();
       if (this.burgerPopoverState === "opening" || this.burgerPopoverState === "open") this.positionBurgerPopover();
       this.closeWhenBurgerLeavesRail();
     });
@@ -609,7 +633,7 @@ class MenuCategoryController {
     }
 
     if (key === this.activeTop) {
-      if (isMobileViewport()) this.moveCategoryRail(tab);
+      if (usesNativeCategoryRail()) this.moveCategoryRail(tab);
       return;
     }
 
@@ -880,7 +904,7 @@ class MenuCategoryController {
   }
 
   refreshCategoryRailMetrics() {
-    if (isMobileViewport() || !menuCategorySwitcher) return;
+    if (usesNativeCategoryRail() || !menuCategorySwitcher) return;
 
     const state = this.railState;
     state.maxScrollLeft = Math.max(0, menuCategorySwitcher.scrollWidth - menuCategorySwitcher.clientWidth);
@@ -934,7 +958,7 @@ class MenuCategoryController {
   }
 
   writeCategoryRailScroll(value) {
-    if (isMobileViewport() || !menuCategorySwitcher) return 0;
+    if (usesNativeCategoryRail() || !menuCategorySwitcher) return 0;
 
     const next = this.clampCategoryRailScroll(value);
     menuCategorySwitcher.scrollLeft = next;
@@ -1040,8 +1064,68 @@ class MenuCategoryController {
     }
   }
 
+  handleNativeCategoryRailPointerDown(event) {
+    if (!usesNativeCategoryRail() || event.isPrimary === false) return;
+
+    this.cancelCategoryRailMotion();
+    this.cancelMobileCategoryRailMotion();
+    this.nativeRailGesture = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startScrollLeft: menuCategorySwitcher?.scrollLeft || 0,
+      intent: null,
+      moved: false,
+    };
+  }
+
+  handleNativeCategoryRailPointerMove(event) {
+    const gesture = this.nativeRailGesture;
+    if (!usesNativeCategoryRail() || !gesture || event.pointerId !== gesture.pointerId) return;
+    if (gesture.intent === "vertical") return;
+
+    const horizontalDistance = Math.abs(event.clientX - gesture.startX);
+    const verticalDistance = Math.abs(event.clientY - gesture.startY);
+    if (Math.max(horizontalDistance, verticalDistance) < menuRailGestureThreshold) return;
+
+    gesture.intent = horizontalDistance > verticalDistance * 1.15 ? "horizontal" : "vertical";
+    if (gesture.intent === "horizontal") gesture.moved = true;
+  }
+
+  handleNativeCategoryRailPointerEnd(event) {
+    const gesture = this.nativeRailGesture;
+    if (!usesNativeCategoryRail() || !gesture || event.pointerId !== gesture.pointerId) return;
+
+    this.nativeRailGesture = null;
+    if (!gesture.moved) return;
+
+    const state = this.railState;
+    state.nativeClickSuppression = true;
+    window.clearTimeout(state.nativeClickTimer);
+    state.nativeClickTimer = window.setTimeout(() => {
+      state.nativeClickSuppression = false;
+      state.nativeClickTimer = 0;
+    }, 0);
+  }
+
+  cancelNativeCategoryRailPointer(event) {
+    const gesture = this.nativeRailGesture;
+    if (gesture && event.pointerId === gesture.pointerId) this.nativeRailGesture = null;
+  }
+
+  handleNativeCategoryRailClick(event) {
+    const state = this.railState;
+    if (!state.nativeClickSuppression || !(event.target instanceof Element) || !event.target.closest(".menu-category-tab")) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    state.nativeClickSuppression = false;
+    window.clearTimeout(state.nativeClickTimer);
+    state.nativeClickTimer = 0;
+  }
+
   handleCategoryRailPointerDown(event) {
-    if (isMobileViewport()) return;
+    if (usesNativeCategoryRail()) return;
     if (!this.hasCategoryRailOverflow()) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
     if (event.isPrimary === false) return;
@@ -1079,7 +1163,7 @@ class MenuCategoryController {
   }
 
   handleCategoryRailPointerMove(event) {
-    if (isMobileViewport()) return;
+    if (usesNativeCategoryRail()) return;
     const state = this.railState;
     if (event.pointerId !== state.pointerId || !menuCategorySwitcher) return;
     if (state.phase === "native-touch") return;
@@ -1118,7 +1202,7 @@ class MenuCategoryController {
   }
 
   handleCategoryRailPointerEnd(event) {
-    if (isMobileViewport()) return;
+    if (usesNativeCategoryRail()) return;
     const state = this.railState;
     if (event.pointerId !== state.pointerId) return;
 
@@ -1140,7 +1224,7 @@ class MenuCategoryController {
   }
 
   cancelCategoryRailPointer(event) {
-    if (isMobileViewport()) return;
+    if (usesNativeCategoryRail()) return;
     const state = this.railState;
     if (event.pointerId !== state.pointerId) return;
     if (event.type === "lostpointercapture" && state.pointerType === "touch") return;
@@ -1161,7 +1245,7 @@ class MenuCategoryController {
   }
 
   handleCategoryRailClick(event) {
-    if (isMobileViewport()) return;
+    if (usesNativeCategoryRail()) return;
     const state = this.railState;
     if (!state.suppressClick || !(event.target instanceof Element) || !event.target.closest(".menu-category-tab")) return;
 
@@ -1185,7 +1269,7 @@ class MenuCategoryController {
   }
 
   handleCategoryRailWheel(event) {
-    if (isMobileViewport()) return;
+    if (usesNativeCategoryRail()) return;
     if (event.ctrlKey || !this.hasCategoryRailOverflow() || !menuCategorySwitcher) return;
 
     const delta = this.normaliseCategoryRailWheel(event);
@@ -1235,7 +1319,7 @@ class MenuCategoryController {
 
   startCategoryRailInertia() {
     const state = this.railState;
-    if (isMobileViewport() || !menuCategorySwitcher || prefersReducedMotion) {
+    if (usesNativeCategoryRail() || !menuCategorySwitcher || prefersReducedMotion) {
       this.startCategoryRailSnap({ immediate: true });
       return;
     }
@@ -1278,7 +1362,7 @@ class MenuCategoryController {
   }
 
   startCategoryRailSnap({ immediate = false } = {}) {
-    if (isMobileViewport() || !menuCategorySwitcher || !this.hasCategoryRailOverflow()) {
+    if (usesNativeCategoryRail() || !menuCategorySwitcher || !this.hasCategoryRailOverflow()) {
       this.finishCategoryRailMotion();
       return;
     }
@@ -1369,7 +1453,7 @@ class MenuCategoryController {
   }
 
   moveCategoryRail(tab, direction = "neutral", { immediate = false } = {}) {
-    if (isMobileViewport()) {
+    if (usesNativeCategoryRail()) {
       this.moveMobileCategoryRail(tab, { immediate });
       return;
     }
@@ -1406,7 +1490,14 @@ class MenuCategoryController {
   }
 
   handleCategoryRailScroll() {
-    if (isMobileViewport()) return;
+    if (usesNativeCategoryRail()) {
+      const gesture = this.nativeRailGesture;
+      if (gesture && Math.abs((menuCategorySwitcher?.scrollLeft || 0) - gesture.startScrollLeft) > 1) {
+        gesture.intent = "horizontal";
+        gesture.moved = true;
+      }
+      return;
+    }
     const state = this.railState;
     if (state.phase === "native-touch") {
       const scrollLeft = menuCategorySwitcher?.scrollLeft || 0;
@@ -1419,7 +1510,7 @@ class MenuCategoryController {
   }
 
   handleCategoryRailScrollEnd() {
-    if (isMobileViewport()) return;
+    if (usesNativeCategoryRail()) return;
     const state = this.railState;
     if (state.phase !== "native-touch" || state.nativeTouchActive) return;
 
@@ -1430,7 +1521,7 @@ class MenuCategoryController {
   }
 
   completeNativeTouchGesture() {
-    if (isMobileViewport()) return;
+    if (usesNativeCategoryRail()) return;
     const state = this.railState;
     if (state.phase !== "native-touch") return;
 
@@ -1563,7 +1654,7 @@ class MenuCategoryController {
     }
 
     const request = ++this.generation;
-    if (isMobileViewport()) {
+    if (usesNativeCategoryRail()) {
       this.startTopCategoryTransition(key, nextPanel, request, { railAlreadyAligned });
       return;
     }
