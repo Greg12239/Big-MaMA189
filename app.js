@@ -2189,3 +2189,147 @@ function initLocationMap() {
 }
 
 initLocationMap();
+
+// The production GitHub Pages site serves index.html directly. Keep this controller
+// dormant when the same markup is rendered through Next, where ConsentManager owns it.
+function initLegacyConsentManager() {
+  const consentRoot = document.querySelector("[data-legacy-consent-root]");
+  if (!consentRoot || isNextStaticExport() || consentRoot.dataset.consentInitialized === "true") return;
+
+  const storageKey = "big-mama-consent-v1";
+  const defaultPreferences = { analytics: false, marketing: false, version: 1 };
+  const banner = consentRoot.querySelector("[data-cookie-banner]");
+  const dialog = consentRoot.querySelector("[data-cookie-settings-dialog]");
+  const analyticsInput = consentRoot.querySelector("[data-consent-analytics]");
+  const marketingInput = consentRoot.querySelector("[data-consent-marketing]");
+  let preferences = null;
+  let settingsOpener = null;
+
+  const parsePreferences = (value) => {
+    if (!value) return null;
+
+    try {
+      const parsed = JSON.parse(value);
+      if (
+        parsed &&
+        parsed.version === 1 &&
+        typeof parsed.analytics === "boolean" &&
+        typeof parsed.marketing === "boolean"
+      ) {
+        return parsed;
+      }
+    } catch {
+      // Invalid or stale stored data is handled as unresolved consent.
+    }
+
+    return null;
+  };
+
+  const applyGoogleConsent = (nextPreferences, command) => {
+    window.gtag?.("consent", command, {
+      analytics_storage: nextPreferences.analytics ? "granted" : "denied",
+      ad_storage: nextPreferences.marketing ? "granted" : "denied",
+      ad_user_data: nextPreferences.marketing ? "granted" : "denied",
+      ad_personalization: nextPreferences.marketing ? "granted" : "denied",
+      functionality_storage: "denied",
+      personalization_storage: nextPreferences.marketing ? "granted" : "denied",
+      security_storage: "granted",
+    });
+  };
+
+  const showBanner = () => {
+    if (banner) banner.hidden = false;
+  };
+
+  const hideBanner = () => {
+    if (banner) banner.hidden = true;
+  };
+
+  const syncInputs = (nextPreferences) => {
+    if (analyticsInput) analyticsInput.checked = nextPreferences.analytics;
+    if (marketingInput) marketingInput.checked = nextPreferences.marketing;
+  };
+
+  const restoreFocus = () => {
+    const opener = settingsOpener;
+    settingsOpener = null;
+    if (opener?.isConnected) window.requestAnimationFrame(() => opener.focus({ preventScroll: true }));
+  };
+
+  const closeSettings = () => {
+    if (dialog?.open) dialog.close();
+    else restoreFocus();
+  };
+
+  const openSettings = (opener) => {
+    if (!dialog) return;
+    settingsOpener = opener;
+    syncInputs(preferences ?? defaultPreferences);
+    if (!dialog.open) dialog.showModal();
+  };
+
+  const savePreferences = (nextPreferences) => {
+    preferences = nextPreferences;
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(nextPreferences));
+    } catch {
+      // Consent remains active for this page even if storage is unavailable.
+    }
+    applyGoogleConsent(nextPreferences, "update");
+    hideBanner();
+    closeSettings();
+  };
+
+  consentRoot.dataset.consentInitialized = "true";
+  consentRoot.hidden = false;
+  preferences = parsePreferences(window.localStorage.getItem(storageKey));
+  applyGoogleConsent(preferences ?? defaultPreferences, "default");
+  if (preferences) hideBanner();
+  else showBanner();
+
+  consentRoot.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    if (target.closest("[data-consent-reject]")) {
+      savePreferences(defaultPreferences);
+      return;
+    }
+
+    if (target.closest("[data-consent-accept]")) {
+      savePreferences({ analytics: true, marketing: true, version: 1 });
+      return;
+    }
+
+    if (target.closest("[data-consent-save]")) {
+      savePreferences({
+        analytics: Boolean(analyticsInput?.checked),
+        marketing: Boolean(marketingInput?.checked),
+        version: 1,
+      });
+      return;
+    }
+
+    if (target.closest("[data-consent-open]")) {
+      openSettings(target.closest("[data-consent-open]"));
+      return;
+    }
+
+    if (target.closest("[data-consent-close]")) closeSettings();
+  });
+
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element) || consentRoot.contains(target)) return;
+    const trigger = target.closest("[data-cookie-settings]");
+    if (trigger) openSettings(trigger);
+  });
+
+  dialog?.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeSettings();
+  });
+  dialog?.addEventListener("close", restoreFocus);
+}
+
+initLegacyConsentManager();
