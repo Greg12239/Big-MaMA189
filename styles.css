@@ -6077,11 +6077,11 @@ h2 {
     --mobile-nav-hover-lift: -1px;
     --mobile-nav-control-gap: 8px;
     --mobile-nav-hit-height: 44px;
-    --mobile-nav-menu-width: clamp(77px, 20vw, 100px);
-    --mobile-nav-provider-slot: clamp(60px, 15.5vw, 80px);
-    --mobile-nav-provider-height: clamp(32px, 8vw, 36px);
-    --mobile-nav-secondary-width: clamp(52px, 14vw, 68px);
-    --mobile-nav-wolt-size: clamp(42px, 11vw, 48px);
+    --mobile-nav-menu-width: clamp(77px, 20vw, 78px);
+    --mobile-nav-provider-slot: clamp(60px, 15.5vw, 60.45px);
+    --mobile-nav-provider-height: 32px;
+    --mobile-nav-secondary-width: clamp(52px, 14vw, 54.6px);
+    --mobile-nav-wolt-size: clamp(42px, 11vw, 42.9px);
   }
 
   html {
@@ -6460,11 +6460,11 @@ h2 {
   }
 
   h1 {
-    font-size: clamp(2.8rem, 13vw, 3.55rem);
+    font-size: clamp(2.8rem, 13vw, 50.7px);
   }
 
   h2 {
-    font-size: clamp(2.2rem, 10vw, 2.85rem);
+    font-size: clamp(2.2rem, 10vw, 39px);
   }
 
   .hero {
