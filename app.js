@@ -2273,10 +2273,15 @@ function initLegacyConsentManager() {
 
   consentRoot.dataset.consentInitialized = "true";
   consentRoot.hidden = false;
-  preferences = parsePreferences(window.localStorage.getItem(storageKey));
+  try {
+    preferences = parsePreferences(window.localStorage.getItem(storageKey));
+  } catch {
+    preferences = null;
+  }
   applyGoogleConsent(preferences ?? defaultPreferences, "default");
-  if (preferences) hideBanner();
-  else showBanner();
+  // Always show Accept / Reject choices on mobile landing visits without clearing prior consent.
+  if (window.matchMedia("(max-width: 1023px)").matches || !preferences) showBanner();
+  else hideBanner();
 
   consentRoot.addEventListener("click", (event) => {
     const target = event.target;
