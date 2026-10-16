@@ -463,6 +463,7 @@ class MenuCategoryController {
     this.menuEntered = false;
     this.menuEntranceObserver = null;
     this.railMotion = null;
+    this.mobileRailMotion = null;
     this.railState = {
       phase: "idle",
       frame: 0,
@@ -572,6 +573,10 @@ class MenuCategoryController {
       menuCategorySwitcher?.addEventListener("touchcancel", () => this.completeNativeTouchGesture(), { passive: true });
       menuCategorySwitcher?.addEventListener("click", (event) => this.handleCategoryRailClick(event), true);
       menuCategorySwitcher?.addEventListener("wheel", (event) => this.handleCategoryRailWheel(event), { passive: false });
+    } else {
+      ["pointerdown", "wheel"].forEach((eventName) => {
+        menuCategorySwitcher?.addEventListener(eventName, () => this.cancelMobileCategoryRailMotion(), { passive: true });
+      });
     }
     window.addEventListener("resize", () => {
       this.cancelCategoryRailMotion();
@@ -587,6 +592,11 @@ class MenuCategoryController {
 
     if (key === "burgers" && this.activeTop === "burgers") {
       this.toggleBurgerPopover();
+      return;
+    }
+
+    if (key === this.activeTop) {
+      if (isMobileViewport()) this.moveCategoryRail(tab);
       return;
     }
 
@@ -1303,8 +1313,53 @@ class MenuCategoryController {
     this.scheduleCategoryRailFrame(tick);
   }
 
+  cancelMobileCategoryRailMotion() {
+    if (!this.mobileRailMotion) return;
+    if (this.mobileRailMotion.frame) window.cancelAnimationFrame(this.mobileRailMotion.frame);
+    this.mobileRailMotion = null;
+  }
+
+  moveMobileCategoryRail(tab, { immediate = false } = {}) {
+    if (!menuCategorySwitcher || !tab) return;
+
+    this.cancelMobileCategoryRailMotion();
+
+    const rail = menuCategorySwitcher;
+    const maxScrollLeft = Math.max(0, rail.scrollWidth - rail.clientWidth);
+    const idealCenterScroll = tab.offsetLeft + tab.offsetWidth * 0.5 - rail.clientWidth * 0.5;
+    const target = Math.max(0, Math.min(maxScrollLeft, idealCenterScroll));
+    const start = rail.scrollLeft;
+    const finish = () => {
+      rail.scrollLeft = target;
+    };
+
+    if (immediate || window.matchMedia("(prefers-reduced-motion: reduce)").matches || Math.abs(target - start) <= 1) {
+      finish();
+      return;
+    }
+
+    const motion = { frame: 0, startTime: 0 };
+    this.mobileRailMotion = motion;
+    const tick = (timestamp) => {
+      if (this.mobileRailMotion !== motion) return;
+      if (!motion.startTime) motion.startTime = timestamp;
+      const progress = Math.min(1, (timestamp - motion.startTime) / menuRailTravelDuration);
+      rail.scrollLeft = start + (target - start) * cubicBezierEase(progress);
+      if (progress >= 1) {
+        this.mobileRailMotion = null;
+        finish();
+        return;
+      }
+      motion.frame = window.requestAnimationFrame(tick);
+    };
+    motion.frame = window.requestAnimationFrame(tick);
+  }
+
   moveCategoryRail(tab, direction = "neutral", { immediate = false } = {}) {
-    if (isMobileViewport()) return;
+    if (isMobileViewport()) {
+      this.moveMobileCategoryRail(tab, { immediate });
+      return;
+    }
     const anchors = { forward: 0.44, backward: 0.56, neutral: 0.5 };
     const target = menuRailTargetFor(tab, anchors[direction] ?? anchors.neutral);
     if (target === null || !menuCategorySwitcher) return;
@@ -1484,11 +1539,15 @@ class MenuCategoryController {
     const nextPanel = this.panels.find((panel) => panel.dataset.menuPanel === key);
     if (!nextPanel) return;
 
+    if (isMobileViewport()) this.moveCategoryRail(this.tabs.find((tab) => tab.dataset.menuTab === key));
+
     if (this.transition || this.topPreparation || this.burgerTransition || this.burgerPreparation) {
       this.pendingTop = key;
       return;
     }
-    if (key === this.activeTop) return;
+    if (key === this.activeTop) {
+      return;
+    }
 
     const request = ++this.generation;
     if (isMobileViewport()) {
@@ -1532,7 +1591,7 @@ class MenuCategoryController {
     this.updateTitle();
     this.updateStatus();
 
-    if (!railAlreadyAligned) this.moveCategoryRail(this.tabs[nextIndex], railDirection);
+    if (!railAlreadyAligned && !isMobileViewport()) this.moveCategoryRail(this.tabs[nextIndex], railDirection);
     this.transitionPanels({
       kind: "top",
       currentPanel,

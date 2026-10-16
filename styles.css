@@ -4284,8 +4284,21 @@ p {
 }
 
 .footer-links a:hover,
-.footer-links a:focus-visible {
+.footer-links a:focus-visible,
+.footer-links__button:hover,
+.footer-links__button:focus-visible {
   color: var(--orange);
+}
+
+.footer-links__button {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-transform: inherit;
+  cursor: pointer;
 }
 
 .site-footer p {
@@ -6486,6 +6499,95 @@ h2 {
   }
 }
 
+/* Fixed-geometry 180-degree 3D Hero typographic drum */
+.headline-reel {
+  --reel-duration: 1000ms;
+  --reel-ease: cubic-bezier(0.45, 0.05, 0.18, 1);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.headline-reel__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.hero__content { min-width: 0; }
+
+.headline-reel__line {
+  --reel-window-height: 1.28em;
+  --reel-radius: 0.64em;
+  display: block;
+  position: relative;
+  min-width: 0;
+  width: 100%;
+  color: var(--charcoal);
+  font-size: inherit;
+  overflow: visible;
+}
+
+.headline-reel__line--orange { color: var(--orange); }
+
+.headline-reel__viewport {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: var(--reel-window-height);
+  overflow: hidden;
+  isolation: isolate;
+  perspective: 950px;
+  perspective-origin: center center;
+  color: inherit !important;
+}
+
+.headline-reel__drum {
+  position: absolute;
+  inset: 0;
+  display: block;
+  transform-style: preserve-3d;
+  color: inherit !important;
+  transform-origin: 50% 50%;
+  transform: rotateX(0deg);
+  transition: transform var(--reel-duration) var(--reel-ease) var(--headline-reel-delay, 0ms);
+}
+
+.headline-reel[data-headline-phase="alternate"] .headline-reel__drum {
+  transform: rotateX(180deg);
+}
+
+.headline-reel__face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  padding-inline: 2.5%;
+  overflow: hidden;
+  white-space: nowrap;
+  line-height: 1;
+  letter-spacing: inherit;
+  color: inherit !important;
+  text-transform: uppercase;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  pointer-events: none;
+}
+
+.headline-reel__face--front { transform: translateZ(var(--reel-radius)); }
+.headline-reel__face--back { transform: rotateX(180deg) translateZ(var(--reel-radius)); }
+.headline-reel.is-transitioning .headline-reel__drum { will-change: transform; }
+.headline-reel.reel-instant .headline-reel__drum { transition: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .headline-reel__drum { transition: none !important; }
+}
+
 @media (hover: none) {
   .menu-panel.is-active .menu-card.is-menu-visible:hover,
   .menu-panel.is-active .burger-card--featured.is-menu-visible:hover,
@@ -6574,7 +6676,7 @@ h2 {
   margin: 0;
   overflow: visible;
   scroll-snap-type: none;
-  touch-action: pan-y;
+  touch-action: pan-x pan-y;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -6874,8 +6976,8 @@ h2 {
 
 @media (max-width: 1023px) {
   #menu .menu-category-switcher {
-    --menu-rail-leading-gutter: max(8px, calc(50% - 51px));
-    --menu-rail-trailing-gutter: max(8px, calc(50% - 38.5px));
+    --menu-rail-leading-gutter: 8px;
+    --menu-rail-trailing-gutter: 8px;
     display: flex;
     justify-content: flex-start;
     overflow-x: auto;
@@ -7509,5 +7611,32 @@ h2 {
       0 2px 5px rgba(17, 17, 17, 0.045),
       inset 0 1px 0 #fff,
       inset 0 -1px 0 rgba(17, 17, 17, 0.035);
+  }
+}
+
+/* Mobile hero CTAs remain visually stable through all touch states. */
+@media (max-width: 900px) {
+  .hero__actions > .liquid-button.button,
+  .hero__actions > .liquid-button.button:visited,
+  .hero__actions > .liquid-button.button:hover,
+  .hero__actions > .liquid-button.button:active,
+  .hero__actions > .liquid-button.button:focus-visible {
+    background: linear-gradient(135deg, #ff5400, #e64800 58%, #ff7a2a);
+    box-shadow:
+      0 14px 30px rgba(255, 84, 0, 0.26),
+      0 5px 12px rgba(17, 17, 17, 0.08);
+    color: #ffffff;
+    transform: none;
+    transition: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .hero__actions > .liquid-button.button .liquid-layer {
+    display: none;
+  }
+
+  .hero__actions > .liquid-button.button:focus-visible {
+    outline: 3px solid #ffffff;
+    outline-offset: 3px;
   }
 }

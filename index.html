@@ -182,9 +182,26 @@
         </div>
 
         <div class="hero__content reveal">
-          <h1 id="hero-title">
-            Big taste.
-            <span>Big Mama attitude.</span>
+          <h1 id="hero-title" class="headline-reel" data-headline-reel data-headline-phase="base">
+            <span class="headline-reel__sr-only">Big taste. Big Mama attitude.</span>
+            <span class="headline-reel__line headline-reel__line--ink" style="--headline-reel-delay: 0ms" aria-hidden="true">
+              <span class="headline-reel__viewport"><span class="headline-reel__drum">
+                <span class="headline-reel__face headline-reel__face--front">Big taste.</span>
+                <span class="headline-reel__face headline-reel__face--back">Smashed fresh.</span>
+              </span></span>
+            </span>
+            <span class="headline-reel__line headline-reel__line--orange" style="--headline-reel-delay: 130ms" aria-hidden="true">
+              <span class="headline-reel__viewport"><span class="headline-reel__drum">
+                <span class="headline-reel__face headline-reel__face--front">Big Mama</span>
+                <span class="headline-reel__face headline-reel__face--back">Stacked high.</span>
+              </span></span>
+            </span>
+            <span class="headline-reel__line headline-reel__line--orange" style="--headline-reel-delay: 260ms" aria-hidden="true">
+              <span class="headline-reel__viewport"><span class="headline-reel__drum">
+                <span class="headline-reel__face headline-reel__face--front">Attitude.</span>
+                <span class="headline-reel__face headline-reel__face--back">Served loud.</span>
+              </span></span>
+            </span>
           </h1>
           <p class="hero__copy">
             Premium street food με 100% μοσχαρίσιο κιμά, βουτυρένια brioche,
@@ -1112,6 +1129,15 @@
       </section>
 
     </main>
+
+    <footer class="site-footer" aria-label="Site information">
+      <p>© Big Mama Burgers n&apos; Fries</p>
+      <nav class="footer-links" aria-label="Legal links">
+        <a href="/privacy-policy">Privacy Policy</a>
+        <a href="/cookie-policy">Cookie Policy</a>
+        <button class="footer-links__button" type="button" data-cookie-settings>Cookie settings</button>
+      </nav>
+    </footer>
 
     <script
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"

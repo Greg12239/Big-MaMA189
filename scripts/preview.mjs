@@ -1,4 +1,4 @@
-import { createReadStream, existsSync } from "node:fs";
+import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join, normalize } from "node:path";
 
@@ -18,10 +18,20 @@ createServer((request, response) => {
   const requestedPath = decodeURIComponent(new URL(request.url || "/", `http://localhost:${port}`).pathname);
   const relativePath = requestedPath === "/" ? "index.html" : requestedPath.replace(/^\/+/, "");
   const resolvedPath = normalize(join(root, relativePath));
-  const fallbackPath = join(resolvedPath, "index.html");
-  const filePath = existsSync(resolvedPath) ? resolvedPath : fallbackPath;
+  const routePath = requestedPath === "/"
+    ? join(root, "index.html")
+    : join(root, `${relativePath.replace(/\/+$/, "")}.html`);
+  const directoryIndexPath = join(resolvedPath, "index.html");
+  const candidates = [resolvedPath, routePath, directoryIndexPath];
+  const filePath = candidates.find((candidate) => {
+    try {
+      return existsSync(candidate) && statSync(candidate).isFile();
+    } catch {
+      return false;
+    }
+  });
 
-  if (!filePath.startsWith(root) || !existsSync(filePath)) {
+  if (!filePath || !filePath.startsWith(root)) {
     response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
     response.end("Not found");
     return;

@@ -18,7 +18,9 @@ export function LegacyRuntime() {
     const startRuntime = async () => {
       if (cancelled || window.__bigMamaRuntimeStarted) return;
       window.__bigMamaRuntimeStarted = true;
+      // @ts-expect-error Legacy browser script intentionally has no module exports.
       await import("../../../app.js");
+      // @ts-expect-error Legacy browser script intentionally has no module exports.
       await import("../../../reviews-orbit.js");
     };
 
