@@ -42,10 +42,15 @@ const menuRailNativeTouchSettleDelay = 180;
 const loaderExitDelay = prefersReducedMotion ? 140 : 1500;
 const loaderExitDuration = prefersReducedMotion ? 160 : 760;
 const loaderFailSafeDelay = prefersReducedMotion ? 900 : 3600;
+const isNextStaticExport = () => Boolean(document.querySelector('script[src*="/_next/"]'));
+const resolveMenuTitleAsset = (assetPath) => {
+  if (isNextStaticExport()) return `/assets/${assetPath}`;
+  return new URL(`public/assets/${assetPath}`, document.baseURI).href;
+};
 const menuTitleAssets = {
-  generic: { src: "./assets/MENU-nav-transparent.png", width: 1120, height: 486 },
-  beef: { src: "./assets/menu/beef-burgers-title.png", width: 1078, height: 772 },
-  chicken: { src: "./assets/menu/chicken-burgers-title-transparent.png", width: 1218, height: 774 },
+  generic: { src: resolveMenuTitleAsset("MENU-nav-transparent.png"), width: 1120, height: 486 },
+  beef: { src: resolveMenuTitleAsset("menu/beef-burgers-title.png"), width: 1078, height: 772 },
+  chicken: { src: resolveMenuTitleAsset("menu/chicken-burgers-title-transparent.png"), width: 1218, height: 774 },
 };
 const menuTitlePreloads = new Map();
 let loaderStartTimer = 0;
@@ -61,28 +66,36 @@ function preloadMenuTitle(source) {
 
   const image = new Image();
   const ready = new Promise((resolve) => {
-    const finish = () => resolve();
+    let settled = false;
+    const finish = (loaded) => {
+      if (settled) return;
+      settled = true;
+      resolve(loaded);
+    };
+    const finishLoaded = () => {
+      if (!image.naturalWidth) {
+        finish(false);
+        return;
+      }
+
+      if (typeof image.decode === "function") {
+        image.decode().then(() => finish(true)).catch(() => finish(false));
+      } else {
+        finish(true);
+      }
+    };
 
     image.addEventListener(
       "load",
-      () => {
-        if (typeof image.decode === "function") {
-          image.decode().catch(() => undefined).finally(finish);
-        } else {
-          finish();
-        }
-      },
+      finishLoaded,
       { once: true }
     );
-    image.addEventListener("error", finish, { once: true });
+    image.addEventListener("error", () => finish(false), { once: true });
     image.src = source;
 
     if (image.complete) {
-      if (typeof image.decode === "function") {
-        image.decode().catch(() => undefined).finally(finish);
-      } else {
-        finish();
-      }
+      if (image.naturalWidth) finishLoaded();
+      else finish(false);
     }
   });
 
@@ -1726,7 +1739,7 @@ class MenuCategoryController {
     });
   }
 
-  updateTitle({ immediate = false } = {}) {
+  updateTitle() {
     const title = this.activeTop === "burgers"
       ? (this.activeBurger === "chicken" ? menuTitleAssets.chicken : this.activeBurger === "beef" ? menuTitleAssets.beef : menuTitleAssets.generic)
       : menuTitleAssets.generic;
@@ -1734,10 +1747,11 @@ class MenuCategoryController {
     if (!menuTitle || !title) return;
 
     const request = ++this.titleRequest;
+    const resolvedSource = new URL(title.src, document.baseURI).href;
+    const sourceChanged = menuTitle.src !== resolvedSource;
     const commit = () => {
       if (request !== this.titleRequest) return;
 
-      const sourceChanged = menuTitle.getAttribute("src") !== title.src;
       menuTitle.width = title.width;
       menuTitle.height = title.height;
       menuTitle.alt = "";
@@ -1755,10 +1769,12 @@ class MenuCategoryController {
       }, menuTitleSwitchDuration);
     };
 
-    if (immediate || isMobileViewport()) {
+    if (!sourceChanged) {
       commit();
     } else {
-      preloadMenuTitle(title.src).then(commit);
+      preloadMenuTitle(title.src).then((loaded) => {
+        if (loaded) commit();
+      });
     }
   }
 
