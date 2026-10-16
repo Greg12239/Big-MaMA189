@@ -7691,3 +7691,19 @@ h2 {
   .cookie-consent__actions, .cookie-settings__actions { justify-content: stretch; }
   .cookie-consent__button { flex: 1 1 130px; }
 }
+
+/* Mobile: avoid compositor-heavy blur and transforms on the scrollable category rail. */
+@media (max-width: 1023px) {
+  #menu .menu-category-navigation.reveal,
+  #menu .menu-category-navigation.reveal.is-visible {
+    transform: none;
+  }
+
+  #menu .menu-category-switcher {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: #fff;
+    scroll-behavior: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
