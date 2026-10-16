@@ -480,6 +480,7 @@ class MenuCategoryController {
     this.railMotion = null;
     this.mobileRailMotion = null;
     this.nativeRailGesture = null;
+    this.nativeRailHasUserInteracted = false;
     this.railState = {
       phase: "idle",
       frame: 0,
@@ -509,7 +510,6 @@ class MenuCategoryController {
       suppressClick: false,
       nativeTouchActive: false,
       nativeTouchMoved: false,
-      nativeClickTimer: 0,
       nativeClickSuppression: false,
     };
     this.titleTimer = null;
@@ -536,6 +536,7 @@ class MenuCategoryController {
 
     const alignInitialCategoryRail = () => {
       window.requestAnimationFrame(() => {
+        if (usesNativeCategoryRail() && this.nativeRailHasUserInteracted) return;
         if (!usesNativeCategoryRail()) this.refreshCategoryRailMetrics();
         this.moveCategoryRail(this.tabs.find((tab) => tab.dataset.menuTab === this.activeTop), "neutral", { immediate: true });
       });
@@ -584,10 +585,6 @@ class MenuCategoryController {
       if (usesNativeCategoryRail()) this.handleNativeCategoryRailPointerDown(event);
       else this.handleCategoryRailPointerDown(event);
     });
-    menuCategorySwitcher?.addEventListener("pointermove", (event) => {
-      if (usesNativeCategoryRail()) this.handleNativeCategoryRailPointerMove(event);
-      else this.handleCategoryRailPointerMove(event);
-    }, { passive: false });
     menuCategorySwitcher?.addEventListener("pointerup", (event) => {
       if (usesNativeCategoryRail()) this.handleNativeCategoryRailPointerEnd(event);
       else this.handleCategoryRailPointerEnd(event);
@@ -610,10 +607,20 @@ class MenuCategoryController {
       if (usesNativeCategoryRail()) this.handleNativeCategoryRailClick(event);
       else this.handleCategoryRailClick(event);
     }, true);
-    menuCategorySwitcher?.addEventListener("wheel", (event) => {
-      if (usesNativeCategoryRail()) this.cancelMobileCategoryRailMotion();
-      else this.handleCategoryRailWheel(event);
-    }, { passive: false });
+    this.syncCategoryRailInputHandlers = () => {
+      if (!menuCategorySwitcher) return;
+
+      menuCategorySwitcher.removeEventListener("pointermove", this.handleDesktopCategoryRailPointerMove);
+      menuCategorySwitcher.removeEventListener("wheel", this.handleDesktopCategoryRailWheel);
+      if (usesNativeCategoryRail()) return;
+
+      menuCategorySwitcher.addEventListener("pointermove", this.handleDesktopCategoryRailPointerMove, { passive: false });
+      menuCategorySwitcher.addEventListener("wheel", this.handleDesktopCategoryRailWheel, { passive: false });
+    };
+    this.handleDesktopCategoryRailPointerMove = (event) => this.handleCategoryRailPointerMove(event);
+    this.handleDesktopCategoryRailWheel = (event) => this.handleCategoryRailWheel(event);
+    this.syncCategoryRailInputHandlers();
+    nativeCategoryRailViewportQuery.addEventListener("change", this.syncCategoryRailInputHandlers);
     window.addEventListener("resize", () => {
       this.cancelCategoryRailMotion();
       this.cancelMobileCategoryRailMotion();
@@ -1069,59 +1076,62 @@ class MenuCategoryController {
 
     this.cancelCategoryRailMotion();
     this.cancelMobileCategoryRailMotion();
+    this.clearNativeCategoryRailClickSuppression();
+    this.nativeRailHasUserInteracted = true;
+    if (event.pointerType !== "touch") return;
+
     this.nativeRailGesture = {
       pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
       startScrollLeft: menuCategorySwitcher?.scrollLeft || 0,
-      intent: null,
       moved: false,
+      cancelled: false,
     };
   }
 
-  handleNativeCategoryRailPointerMove(event) {
+  clearNativeCategoryRailClickSuppression() {
+    this.railState.nativeClickSuppression = false;
+  }
+
+  updateNativeCategoryRailGesture() {
     const gesture = this.nativeRailGesture;
-    if (!usesNativeCategoryRail() || !gesture || event.pointerId !== gesture.pointerId) return;
-    if (gesture.intent === "vertical") return;
+    if (!gesture || !menuCategorySwitcher) return;
 
-    const horizontalDistance = Math.abs(event.clientX - gesture.startX);
-    const verticalDistance = Math.abs(event.clientY - gesture.startY);
-    if (Math.max(horizontalDistance, verticalDistance) < menuRailGestureThreshold) return;
-
-    gesture.intent = horizontalDistance > verticalDistance * 1.15 ? "horizontal" : "vertical";
-    if (gesture.intent === "horizontal") gesture.moved = true;
+    if (Math.abs(menuCategorySwitcher.scrollLeft - gesture.startScrollLeft) <= 1) return;
+    gesture.moved = true;
+    this.railState.nativeClickSuppression = true;
   }
 
   handleNativeCategoryRailPointerEnd(event) {
     const gesture = this.nativeRailGesture;
     if (!usesNativeCategoryRail() || !gesture || event.pointerId !== gesture.pointerId) return;
 
+    this.updateNativeCategoryRailGesture();
     this.nativeRailGesture = null;
-    if (!gesture.moved) return;
-
-    const state = this.railState;
-    state.nativeClickSuppression = true;
-    window.clearTimeout(state.nativeClickTimer);
-    state.nativeClickTimer = window.setTimeout(() => {
-      state.nativeClickSuppression = false;
-      state.nativeClickTimer = 0;
-    }, 0);
   }
 
   cancelNativeCategoryRailPointer(event) {
     const gesture = this.nativeRailGesture;
-    if (gesture && event.pointerId === gesture.pointerId) this.nativeRailGesture = null;
+    if (!gesture || event.pointerId !== gesture.pointerId) return;
+
+    // Browsers can cancel the pointer stream when they take ownership of native scrolling.
+    // Keep this gesture until the resulting click is consumed or the next pointerdown replaces it.
+    this.updateNativeCategoryRailGesture();
+    gesture.cancelled = true;
   }
 
   handleNativeCategoryRailClick(event) {
     const state = this.railState;
-    if (!state.nativeClickSuppression || !(event.target instanceof Element) || !event.target.closest(".menu-category-tab")) return;
+    if (
+      !state.nativeClickSuppression
+      || event.detail === 0
+      || !(event.target instanceof Element)
+      || !event.target.closest(".menu-category-tab")
+    ) return;
 
     event.preventDefault();
     event.stopPropagation();
-    state.nativeClickSuppression = false;
-    window.clearTimeout(state.nativeClickTimer);
-    state.nativeClickTimer = 0;
+    this.clearNativeCategoryRailClickSuppression();
+    this.nativeRailGesture = null;
   }
 
   handleCategoryRailPointerDown(event) {
@@ -1416,45 +1426,30 @@ class MenuCategoryController {
     this.mobileRailMotion = null;
   }
 
-  moveMobileCategoryRail(tab, { immediate = false } = {}) {
+  moveMobileCategoryRail(tab) {
     if (!menuCategorySwitcher || !tab) return;
 
     this.cancelMobileCategoryRailMotion();
 
     const rail = menuCategorySwitcher;
     const maxScrollLeft = Math.max(0, rail.scrollWidth - rail.clientWidth);
-    const idealCenterScroll = tab.offsetLeft + tab.offsetWidth * 0.5 - rail.clientWidth * 0.5;
-    const target = Math.max(0, Math.min(maxScrollLeft, idealCenterScroll));
-    const start = rail.scrollLeft;
-    const finish = () => {
-      rail.scrollLeft = target;
-    };
+    const tabStart = tab.offsetLeft;
+    const tabEnd = tabStart + tab.offsetWidth;
+    const viewportStart = rail.scrollLeft;
+    const viewportEnd = viewportStart + rail.clientWidth;
+    const target = tabStart < viewportStart
+      ? tabStart
+      : tabEnd > viewportEnd
+        ? tabEnd - rail.clientWidth
+        : viewportStart;
+    const next = Math.max(0, Math.min(maxScrollLeft, target));
 
-    if (immediate || window.matchMedia("(prefers-reduced-motion: reduce)").matches || Math.abs(target - start) <= 1) {
-      finish();
-      return;
-    }
-
-    const motion = { frame: 0, startTime: 0 };
-    this.mobileRailMotion = motion;
-    const tick = (timestamp) => {
-      if (this.mobileRailMotion !== motion) return;
-      if (!motion.startTime) motion.startTime = timestamp;
-      const progress = Math.min(1, (timestamp - motion.startTime) / menuRailTravelDuration);
-      rail.scrollLeft = start + (target - start) * cubicBezierEase(progress);
-      if (progress >= 1) {
-        this.mobileRailMotion = null;
-        finish();
-        return;
-      }
-      motion.frame = window.requestAnimationFrame(tick);
-    };
-    motion.frame = window.requestAnimationFrame(tick);
+    if (Math.abs(next - viewportStart) > 1) rail.scrollLeft = next;
   }
 
   moveCategoryRail(tab, direction = "neutral", { immediate = false } = {}) {
     if (usesNativeCategoryRail()) {
-      this.moveMobileCategoryRail(tab, { immediate });
+      this.moveMobileCategoryRail(tab);
       return;
     }
     const anchors = { forward: 0.44, backward: 0.56, neutral: 0.5 };
@@ -1491,11 +1486,7 @@ class MenuCategoryController {
 
   handleCategoryRailScroll() {
     if (usesNativeCategoryRail()) {
-      const gesture = this.nativeRailGesture;
-      if (gesture && Math.abs((menuCategorySwitcher?.scrollLeft || 0) - gesture.startScrollLeft) > 1) {
-        gesture.intent = "horizontal";
-        gesture.moved = true;
-      }
+      this.updateNativeCategoryRailGesture();
       return;
     }
     const state = this.railState;
@@ -1643,7 +1634,7 @@ class MenuCategoryController {
     const nextPanel = this.panels.find((panel) => panel.dataset.menuPanel === key);
     if (!nextPanel) return;
 
-    if (isMobileViewport()) this.moveCategoryRail(this.tabs.find((tab) => tab.dataset.menuTab === key));
+    if (usesNativeCategoryRail()) this.moveCategoryRail(this.tabs.find((tab) => tab.dataset.menuTab === key));
 
     if (this.transition || this.topPreparation || this.burgerTransition || this.burgerPreparation) {
       this.pendingTop = key;
@@ -1695,7 +1686,7 @@ class MenuCategoryController {
     this.updateTitle();
     this.updateStatus();
 
-    if (!railAlreadyAligned && !isMobileViewport()) this.moveCategoryRail(this.tabs[nextIndex], railDirection);
+    if (!railAlreadyAligned && !usesNativeCategoryRail()) this.moveCategoryRail(this.tabs[nextIndex], railDirection);
     this.transitionPanels({
       kind: "top",
       currentPanel,
