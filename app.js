@@ -54,6 +54,88 @@ const menuTitleAssets = {
   beef: { src: resolveMenuTitleAsset("menu/beef-burgers-title.png"), width: 1078, height: 772 },
   chicken: { src: resolveMenuTitleAsset("menu/chicken-burgers-title-transparent.png"), width: 1218, height: 774 },
 };
+const cocaColaVariantConfig = Object.freeze([
+  {
+    id: "original",
+    label: "Original",
+    title: "Coca-Cola Original",
+    description: "The classic Coca-Cola taste, served ice-cold.",
+    image: resolveMenuTitleAsset("menu/coca-cola/coca-cola-original.png"),
+    woltItemUrl: "https://wolt.com/el/grc/athens/restaurant/big-mama-burgers-n-fries/coca-cola-0-33-l-itemid-11f0af0ca832856f6d585671",
+  },
+  {
+    id: "zero-sugar",
+    label: "Zero Sugar",
+    title: "Coca-Cola Zero Sugar",
+    description: "All the Coca-Cola taste, with zero sugar.",
+    image: resolveMenuTitleAsset("menu/coca-cola/coca-cola-zero-sugar.png"),
+  },
+  {
+    id: "light",
+    label: "Light",
+    title: "Coca-Cola Light",
+    description: "A lighter Coca-Cola option with a crisp, refreshing taste.",
+    image: resolveMenuTitleAsset("menu/coca-cola/coca-cola-light.png"),
+  },
+  {
+    id: "zero-caffeine",
+    label: "Zero Caffeine",
+    title: "Coca-Cola Zero Caffeine",
+    description: "Zero sugar, zero caffeine, full refreshment.",
+    image: resolveMenuTitleAsset("menu/coca-cola/coca-cola-zero-caffeine.png"),
+  },
+]);
+const cocaColaVariantsById = new Map(cocaColaVariantConfig.map((variant) => [variant.id, variant]));
+const fantaVariantConfig = Object.freeze([
+  {
+    id: "original",
+    label: "Original",
+    title: "FANTA ORANGE",
+    description: "Refreshing orange flavor with a bright, fruity taste. Served ice-cold.",
+    image: resolveMenuTitleAsset("menu/fanta/fanta-orange.png"),
+  },
+  {
+    id: "zero-sugar",
+    label: "Zero Sugar",
+    title: "FANTA ZERO SUGAR",
+    description: "The refreshing orange taste of Fanta, with zero sugar.",
+    image: resolveMenuTitleAsset("menu/fanta/fanta-zero-sugar.png"),
+  },
+  {
+    id: "blue-orange",
+    label: "Blue Orange",
+    title: "FANTA ORANGE BLUE",
+    description: "A smooth, non-carbonated orange refreshment, served chilled.",
+    image: resolveMenuTitleAsset("menu/fanta/fanta-blue-orange.png"),
+  },
+  {
+    id: "lemon",
+    label: "Lemon",
+    title: "FANTA LEMON",
+    description: "Bright, refreshing lemonade with a delicious citrus taste.",
+    image: resolveMenuTitleAsset("menu/fanta/fanta-lemon.png"),
+  },
+]);
+const fantaVariantsById = new Map(fantaVariantConfig.map((variant) => [variant.id, variant]));
+const spriteVariantConfig = Object.freeze([
+  {
+    id: "original",
+    label: "Original",
+    title: "SPRITE ORIGINAL",
+    description: "Crisp lemon-lime refreshment, served ice-cold.",
+    image: resolveMenuTitleAsset("menu/sprite/sprite-original.png"),
+  },
+  {
+    id: "zero-sugar",
+    label: "Zero Sugar",
+    title: "SPRITE ZERO SUGAR",
+    description: "The refreshing lemon-lime taste of Sprite, with zero sugar.",
+    image: resolveMenuTitleAsset("menu/sprite/sprite-zero-sugar.png"),
+  },
+]);
+const spriteVariantsById = new Map(spriteVariantConfig.map((variant) => [variant.id, variant]));
+const cocaColaRestaurantWoltUrl = "https://wolt.com/el/grc/athens/restaurant/big-mama-burgers-n-fries";
+const cocaColaRestaurantEfoodUrl = "https://www.e-food.gr/delivery/nea-filadelfeia/big-mama-8408071";
 const menuTitlePreloads = new Map();
 let loaderStartTimer = 0;
 let loaderExitTimer = 0;
@@ -104,6 +186,263 @@ function preloadMenuTitle(source) {
   menuTitlePreloads.set(source, ready);
   return ready;
 }
+
+function initDrinkVariantSelector({
+  cardSelector,
+  variantsById,
+  defaultVariantId,
+  optionSelector,
+  imageViewportSelector,
+  titleSelector,
+  descriptionSelector,
+  groupSelector,
+  statusSelector,
+  currentImageSelector,
+  woltLinkSelector,
+  efoodLinkSelector,
+  imageClassName,
+  currentImageAttribute,
+  initializedDatasetKey,
+  restaurantWoltUrl,
+  restaurantEfoodUrl,
+  productName,
+}) {
+  const card = document.querySelector(cardSelector);
+  if (!card || card.dataset[initializedDatasetKey] === "true") return;
+
+  const imageViewport = card.querySelector(imageViewportSelector);
+  const title = card.querySelector(titleSelector);
+  const description = card.querySelector(descriptionSelector);
+  const group = card.querySelector(groupSelector);
+  const status = card.querySelector(statusSelector);
+  const woltLink = card.querySelector(woltLinkSelector);
+  const efoodLink = card.querySelector(efoodLinkSelector);
+  let currentImage = card.querySelector(currentImageSelector);
+
+  if (!imageViewport || !title || !description || !group || !currentImage) return;
+
+  card.dataset[initializedDatasetKey] = "true";
+
+  const imageRequests = new Map();
+  let activeVariantId = defaultVariantId;
+  let selectionRequestToken = 0;
+
+  const resolveImage = (source) => {
+    if (imageRequests.has(source)) return imageRequests.get(source);
+
+    const image = new Image();
+    image.decoding = "async";
+    const request = new Promise((resolve) => {
+      let settled = false;
+      const finish = (loaded) => {
+        if (settled) return;
+        settled = true;
+        resolve(loaded);
+      };
+      const finishLoaded = () => {
+        if (!image.naturalWidth) {
+          finish(false);
+          return;
+        }
+
+        if (typeof image.decode === "function") {
+          image.decode().then(() => finish(true)).catch(() => finish(false));
+        } else {
+          finish(true);
+        }
+      };
+
+      image.addEventListener("load", finishLoaded, { once: true });
+      image.addEventListener("error", () => finish(false), { once: true });
+      image.src = source;
+
+      if (image.complete) {
+        if (image.naturalWidth) finishLoaded();
+        else finish(false);
+      }
+    });
+
+    imageRequests.set(source, request);
+    return request;
+  };
+
+  const syncControls = () => {
+    group.querySelectorAll(optionSelector).forEach((input) => {
+      const option = input.closest("label");
+      const isActive = input.value === activeVariantId;
+      input.checked = isActive;
+      option?.classList.toggle("is-active", isActive);
+    });
+  };
+
+  const syncOrderLinks = (variant) => {
+    if (woltLink) {
+      const hasVerifiedItemUrl = Boolean(variant.woltItemUrl);
+      woltLink.href = hasVerifiedItemUrl ? variant.woltItemUrl : restaurantWoltUrl;
+      woltLink.setAttribute(
+        "aria-label",
+        hasVerifiedItemUrl
+          ? `Order ${variant.title} on Wolt`
+          : `Open ${productName} on Wolt to select ${variant.title}`
+      );
+    }
+
+    if (efoodLink) {
+      efoodLink.href = restaurantEfoodUrl;
+      efoodLink.setAttribute("aria-label", `Open ${productName} on efood to select ${variant.title}`);
+    }
+  };
+
+  const updatePresentation = (variant) => {
+    title.textContent = variant.title;
+    description.textContent = variant.description;
+    syncControls();
+    syncOrderLinks(variant);
+    if (status) status.textContent = `${variant.title} selected.`;
+  };
+
+  const retireImage = (image) => {
+    image.removeAttribute(currentImageAttribute);
+    image.setAttribute("aria-hidden", "true");
+    image.alt = "";
+    image.classList.remove("is-current");
+    image.classList.add("is-retiring");
+
+    if (prefersReducedMotion) {
+      image.remove();
+      return;
+    }
+
+    let fallbackTimer = 0;
+    const remove = () => {
+      window.clearTimeout(fallbackTimer);
+      image.remove();
+    };
+    image.addEventListener("transitionend", (event) => {
+      if (event.propertyName === "opacity") remove();
+    }, { once: true });
+    fallbackTimer = window.setTimeout(remove, 280);
+  };
+
+  const commitSelection = (variant) => {
+    const nextImage = document.createElement("img");
+    nextImage.className = `product-image ${imageClassName}`;
+    nextImage.src = variant.image;
+    nextImage.alt = variant.title;
+    nextImage.width = 1254;
+    nextImage.height = 1254;
+    nextImage.decoding = "async";
+    nextImage.setAttribute(currentImageAttribute, "");
+    imageViewport.append(nextImage);
+
+    const previousImage = currentImage;
+    currentImage = nextImage;
+    activeVariantId = variant.id;
+    updatePresentation(variant);
+    retireImage(previousImage);
+
+    window.requestAnimationFrame(() => {
+      if (currentImage !== nextImage || !nextImage.isConnected) return;
+      nextImage.classList.add("is-current");
+    });
+  };
+
+  const selectVariant = (variantId) => {
+    const variant = variantsById.get(variantId);
+    if (!variant) return;
+
+    const requestToken = ++selectionRequestToken;
+    if (variant.id === activeVariantId) {
+      syncControls();
+      return;
+    }
+
+    syncControls();
+    if (status) status.textContent = `Loading ${variant.title}.`;
+
+    resolveImage(variant.image).then((loaded) => {
+      if (requestToken !== selectionRequestToken) return;
+      if (!loaded) {
+        syncControls();
+        if (status) status.textContent = `Unable to load ${variant.title}. ${variantsById.get(activeVariantId).title} remains selected.`;
+        return;
+      }
+
+      commitSelection(variant);
+    });
+  };
+
+  group.addEventListener("change", (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || !input.matches(optionSelector)) return;
+    selectVariant(input.value);
+  });
+
+  updatePresentation(variantsById.get(activeVariantId));
+}
+
+initDrinkVariantSelector({
+  cardSelector: "[data-coca-cola-variant-card]",
+  variantsById: cocaColaVariantsById,
+  defaultVariantId: "original",
+  optionSelector: "[data-coca-cola-variant-option]",
+  imageViewportSelector: "[data-coca-cola-image-viewport]",
+  titleSelector: "[data-coca-cola-title]",
+  descriptionSelector: "[data-coca-cola-description]",
+  groupSelector: "[data-coca-cola-variant-group]",
+  statusSelector: "[data-coca-cola-status]",
+  currentImageSelector: "[data-coca-cola-image-current]",
+  woltLinkSelector: "[data-coca-cola-wolt-link]",
+  efoodLinkSelector: "[data-coca-cola-efood-link]",
+  imageClassName: "coca-cola-card__product-image",
+  currentImageAttribute: "data-coca-cola-image-current",
+  initializedDatasetKey: "cocaColaVariantInitialized",
+  restaurantWoltUrl: cocaColaRestaurantWoltUrl,
+  restaurantEfoodUrl: cocaColaRestaurantEfoodUrl,
+  productName: "Big Mama",
+});
+
+initDrinkVariantSelector({
+  cardSelector: "[data-fanta-variant-card]",
+  variantsById: fantaVariantsById,
+  defaultVariantId: "original",
+  optionSelector: "[data-fanta-variant-option]",
+  imageViewportSelector: "[data-fanta-image-viewport]",
+  titleSelector: "[data-fanta-title]",
+  descriptionSelector: "[data-fanta-description]",
+  groupSelector: "[data-fanta-variant-group]",
+  statusSelector: "[data-fanta-status]",
+  currentImageSelector: "[data-fanta-image-current]",
+  woltLinkSelector: "[data-fanta-wolt-link]",
+  efoodLinkSelector: "[data-fanta-efood-link]",
+  imageClassName: "fanta-card__product-image",
+  currentImageAttribute: "data-fanta-image-current",
+  initializedDatasetKey: "fantaVariantInitialized",
+  restaurantWoltUrl: cocaColaRestaurantWoltUrl,
+  restaurantEfoodUrl: cocaColaRestaurantEfoodUrl,
+  productName: "Big Mama",
+});
+
+initDrinkVariantSelector({
+  cardSelector: "[data-sprite-variant-card]",
+  variantsById: spriteVariantsById,
+  defaultVariantId: "original",
+  optionSelector: "[data-sprite-variant-option]",
+  imageViewportSelector: "[data-sprite-image-viewport]",
+  titleSelector: "[data-sprite-title]",
+  descriptionSelector: "[data-sprite-description]",
+  groupSelector: "[data-sprite-variant-group]",
+  statusSelector: "[data-sprite-status]",
+  currentImageSelector: "[data-sprite-image-current]",
+  woltLinkSelector: "[data-sprite-wolt-link]",
+  efoodLinkSelector: "[data-sprite-efood-link]",
+  imageClassName: "sprite-card__product-image",
+  currentImageAttribute: "data-sprite-image-current",
+  initializedDatasetKey: "spriteVariantInitialized",
+  restaurantWoltUrl: cocaColaRestaurantWoltUrl,
+  restaurantEfoodUrl: cocaColaRestaurantEfoodUrl,
+  productName: "Big Mama",
+});
 
 function completeLoader() {
   window.clearTimeout(loaderStartTimer);
@@ -2273,15 +2612,10 @@ function initLegacyConsentManager() {
 
   consentRoot.dataset.consentInitialized = "true";
   consentRoot.hidden = false;
-  try {
-    preferences = parsePreferences(window.localStorage.getItem(storageKey));
-  } catch {
-    preferences = null;
-  }
+  preferences = parsePreferences(window.localStorage.getItem(storageKey));
   applyGoogleConsent(preferences ?? defaultPreferences, "default");
-  // Always show Accept / Reject choices on mobile landing visits without clearing prior consent.
-  if (window.matchMedia("(max-width: 1023px)").matches || !preferences) showBanner();
-  else hideBanner();
+  if (preferences) hideBanner();
+  else showBanner();
 
   consentRoot.addEventListener("click", (event) => {
     const target = event.target;

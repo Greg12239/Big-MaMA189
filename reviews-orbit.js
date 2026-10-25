@@ -18,7 +18,7 @@
       this.pointerState = null;
       this.dragFrame = 0;
       this.clickSuppressionUntil = 0;
-      this.detailOpacityValues = Array(7).fill(null);
+      this.detailOpacityValues = [];
       this.arrivalTimer = 0;
       this.effectiveWidth = 0;
       this.maxNaturalCardHeight = 0;
@@ -62,6 +62,7 @@
       this.orbit = this.deck.querySelector("[data-review-orbit]");
       this.slots = Array.from(this.deck.querySelectorAll("[data-review-slot]"));
       this.cards = this.slots.map((slot) => slot.querySelector("[data-review-card]"));
+      this.detailOpacityValues = Array(this.cards.length).fill(null);
       this.detailGroups = this.cards.map((card) => Array.from(card.querySelectorAll(
         ".review-card__meta, .review-card__rating-row, .review-card__text",
       )));
@@ -71,7 +72,8 @@
     validateMarkup() {
       return this.scene
         && this.orbit
-        && this.cards.length === 7
+        && this.cards.length === 5
+        && this.slots.length === this.cards.length
         && this.cards.every(Boolean);
     }
 
@@ -95,14 +97,14 @@
 
     relativeAt(index, step = this.settledStep) {
       let value = this.normalizeIndex(index - this.normalizeIndex(Math.round(step)));
-      if (value > 3) value -= this.cards.length;
+      if (value > Math.floor(this.cards.length / 2)) value -= this.cards.length;
       return value;
     }
 
     resolveTargetStep(index, referenceStep) {
       const referenceIndex = this.normalizeIndex(Math.round(referenceStep));
       let delta = this.normalizeIndex(index - referenceIndex);
-      if (delta > 3) delta -= this.cards.length;
+      if (delta > Math.floor(this.cards.length / 2)) delta -= this.cards.length;
       return Math.round(referenceStep) + delta;
     }
 
@@ -296,22 +298,28 @@
         this.applyPose(index, step, metrics);
         if (updateDetails) {
           const pose = this.calculatePose(index, step, metrics);
-          const detailOpacity = Math.max(0, Math.min(1, (pose.scale - 0.94) / 0.06));
-          this.setDetailOpacity(card, detailOpacity);
+          this.setDetailOpacity(card, this.detailOpacityForPose(pose, metrics));
         }
       });
     }
 
+    detailOpacityForPose(pose, metrics) {
+      const scaleReduction = Math.max(Number.EPSILON, metrics.scaleReduction);
+      const depth = Math.min(1, Math.max(0, (1 - pose.scale) / scaleReduction));
+      return 1 - depth * 0.3;
+    }
+
     setDetailOpacity(card, opacity) {
-      const value = Math.round(opacity * 100) / 100;
+      const value = Math.round(opacity * 1000) / 1000;
       const index = Number(card.dataset.reviewIndex);
-      if (Math.abs((this.detailOpacityValues[index] ?? -1) - value) < 0.02) return;
+      if (this.detailOpacityValues[index] === value) return;
       this.detailOpacityValues[index] = value;
       card.style.setProperty("--review-detail-opacity", String(value));
     }
 
-    syncContentStates(activeIndex = this.activeIndex) {
-      if (this.getMode() === "desktop") {
+    syncContentStates(step = this.settledStep) {
+      const mode = this.getMode();
+      if (mode === "desktop") {
         this.cards.forEach((card) => {
           card.style.removeProperty("--review-detail-opacity");
         });
@@ -319,8 +327,15 @@
         return;
       }
 
+      if (mode === "reduced") {
+        this.cards.forEach((card) => this.setDetailOpacity(card, 1));
+        return;
+      }
+
+      const metrics = this.metrics();
       this.cards.forEach((card, index) => {
-        this.setDetailOpacity(card, index === activeIndex ? 1 : 0);
+        const pose = this.calculatePose(index, step, metrics);
+        this.setDetailOpacity(card, this.detailOpacityForPose(pose, metrics));
       });
     }
 
@@ -341,7 +356,7 @@
           node.classList.toggle("is-left", relative === -1);
           node.classList.toggle("is-right", relative === 1);
           node.classList.toggle("is-depth-2", depth === 2);
-          node.classList.toggle("is-rear", depth === 3);
+          node.classList.toggle("is-rear", depth === Math.floor(this.cards.length / 2));
           node.classList.toggle("is-offscreen", mode === "desktop" && depth > 1);
         });
 
@@ -413,30 +428,20 @@
       });
     }
 
-    buildDetailKeyframes(index, targetIndex) {
-      if (index === this.activeIndex && index !== targetIndex) {
-        return [
-          { offset: 0, opacity: 1 },
-          { offset: 0.22, opacity: 0.78 },
-          { offset: 0.52, opacity: 0 },
-          { offset: 1, opacity: 0 },
-        ];
-      }
-
-      if (index === targetIndex && index !== this.activeIndex) {
-        return [
-          { offset: 0, opacity: 0 },
-          { offset: 0.68, opacity: 0 },
-          { offset: 0.82, opacity: 0.34 },
-          { offset: 1, opacity: 1 },
-        ];
-      }
-
-      const opacity = index === targetIndex ? 1 : 0;
-      return [
-        { offset: 0, opacity },
-        { offset: 1, opacity },
-      ];
+    buildDetailKeyframes(index, fromStep, toStep, metrics) {
+      const frameCount = 13;
+      return Array.from({ length: frameCount }, (_, frame) => {
+        const progress = frame / (frameCount - 1);
+        const pose = this.calculatePose(
+          index,
+          fromStep + (toStep - fromStep) * progress,
+          metrics,
+        );
+        return {
+          offset: progress,
+          opacity: this.detailOpacityForPose(pose, metrics),
+        };
+      });
     }
 
     durationFor() {
@@ -489,10 +494,10 @@
       ));
       const detailAnimations = this.detailGroups.flatMap((group, index) => group.map(
         (element) => element.animate(
-          this.buildDetailKeyframes(index, targetIndex),
+          this.buildDetailKeyframes(index, fromStep, target, metrics),
           {
             duration,
-            easing: "linear",
+            easing: "cubic-bezier(0.16, 1, 0.3, 1)",
             fill: "both",
           },
         ),
@@ -513,7 +518,7 @@
         if (generation !== this.animationGeneration || this.phase !== "settling") return;
 
         this.applyAllPoses(target, metrics, false);
-        this.syncContentStates(targetIndex);
+        this.syncContentStates(target);
         this.releaseAnimations();
 
         this.settledStep = target;

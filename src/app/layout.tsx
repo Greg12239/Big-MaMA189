@@ -55,9 +55,10 @@ const restaurantSchema = {
     longitude: 23.7386331,
   },
   openingHoursSpecification: [
-    { "@type": "OpeningHoursSpecification", dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], opens: "17:00", closes: "01:00" },
+    { "@type": "OpeningHoursSpecification", dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday"], opens: "16:00", closes: "00:00" },
+    { "@type": "OpeningHoursSpecification", dayOfWeek: "Friday", opens: "16:00", closes: "01:00" },
     { "@type": "OpeningHoursSpecification", dayOfWeek: "Saturday", opens: "15:00", closes: "02:00" },
-    { "@type": "OpeningHoursSpecification", dayOfWeek: "Sunday", opens: "14:00", closes: "01:00" },
+    { "@type": "OpeningHoursSpecification", dayOfWeek: "Sunday", opens: "14:00", closes: "00:00" },
   ],
 };
 

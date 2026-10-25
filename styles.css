@@ -1008,7 +1008,7 @@ button {
   inset: -1px;
   z-index: 0;
   border-radius: inherit;
-  background: linear-gradient(135deg, #ff5400, #e64800 58%, #ff7a2a);
+  background: linear-gradient(135deg, #ed641c, #d65314 58%, #ef8240);
   content: "";
   opacity: 0;
   transform: scaleX(0);
@@ -1951,12 +1951,13 @@ p {
   width: min(440px, 78%);
   min-height: 318px;
   padding: clamp(20px, 3vw, 28px);
-  border: 1px solid rgba(255, 84, 0, 0.24);
+  border: 1px solid rgba(255, 84, 0, 0.18);
   border-radius: 28px;
   background: linear-gradient(145deg, #fffefd, #fff8f4);
   box-shadow:
-    0 18px 46px rgba(17, 17, 17, 0.12),
-    0 0 24px rgba(255, 84, 0, 0.1);
+    0 16px 34px rgba(17, 17, 17, 0.11),
+    0 4px 10px rgba(17, 17, 17, 0.045),
+    0 0 14px rgba(255, 84, 0, 0.055);
   color: var(--charcoal);
   cursor: pointer;
   opacity: 0.78;
@@ -1966,7 +1967,8 @@ p {
   transition:
     transform 420ms cubic-bezier(0.22, 1, 0.36, 1),
     opacity 280ms ease,
-    border-color 280ms ease;
+    border-color 260ms ease,
+    box-shadow 260ms ease;
   user-select: none;
   backface-visibility: hidden;
   isolation: isolate;
@@ -1975,30 +1977,31 @@ p {
 
 .review-card::before {
   position: absolute;
-  inset: -12px;
+  inset: -8px;
   z-index: 0;
   border-radius: inherit;
   background: transparent;
-  box-shadow: 0 0 28px rgba(255, 84, 0, 0.15);
+  box-shadow: none;
   content: "";
-  opacity: 0.54;
+  opacity: 0;
   pointer-events: none;
   transition: opacity 280ms ease;
 }
 
 .review-card.is-active {
   z-index: 4;
-  border-color: rgba(255, 84, 0, 0.56);
+  border-color: rgba(255, 84, 0, 0.38);
   box-shadow:
-    0 24px 58px rgba(17, 17, 17, 0.16),
-    0 0 34px rgba(255, 84, 0, 0.16);
+    0 22px 44px rgba(17, 17, 17, 0.15),
+    0 7px 16px rgba(17, 17, 17, 0.065),
+    0 0 18px rgba(255, 84, 0, 0.09);
   opacity: 1;
   transform: translate3d(-50%, 0, 0) scale(1);
 }
 
 .review-card.is-active::before {
-  box-shadow: 0 0 42px rgba(255, 84, 0, 0.22);
-  opacity: 0.88;
+  box-shadow: none;
+  opacity: 0;
 }
 
 .review-card.is-left {
@@ -2048,6 +2051,26 @@ p {
 
 .review-card__avatar--green {
   background: linear-gradient(135deg, #27c987, #16845f);
+}
+
+.review-card__avatar--nikos {
+  background: #5145a8;
+}
+
+.review-card__avatar--thanos {
+  background: #147b9a;
+}
+
+.review-card__avatar--ioanna {
+  background: #a44f83;
+}
+
+.review-card__avatar--antonis {
+  background: #488844;
+}
+
+.review-card__avatar--alexandra {
+  background: #b36a32;
 }
 
 .review-card__top {
@@ -2104,6 +2127,44 @@ p {
     color 220ms ease,
     text-shadow 220ms ease,
     transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.review-card__star {
+  display: inline-block;
+  opacity: 0.78;
+  transform: translateY(0);
+}
+
+.review-card:is(.is-active, .is-arriving) .review-card__star {
+  animation: review-star-reveal 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.review-card:is(.is-active, .is-arriving) .review-card__star:nth-child(2) {
+  animation-delay: 40ms;
+}
+
+.review-card:is(.is-active, .is-arriving) .review-card__star:nth-child(3) {
+  animation-delay: 80ms;
+}
+
+.review-card:is(.is-active, .is-arriving) .review-card__star:nth-child(4) {
+  animation-delay: 120ms;
+}
+
+.review-card:is(.is-active, .is-arriving) .review-card__star:nth-child(5) {
+  animation-delay: 160ms;
+}
+
+@keyframes review-star-reveal {
+  from {
+    opacity: 0.56;
+    transform: translateY(2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .review-card__date {
@@ -2761,7 +2822,6 @@ p {
     transform 380ms cubic-bezier(0.22, 1, 0.36, 1),
     border-color 380ms ease,
     box-shadow 380ms ease;
-  will-change: transform;
 }
 
 .menu-card::before {
@@ -3267,6 +3327,276 @@ p {
 .menu-card__order.is-order-open .burger-card__cta-arrow {
   opacity: 0;
   transform: translateX(-4px);
+}
+
+/* Drink variant selectors: isolated to the DRINKS cards. */
+#menu [data-coca-cola-variant-card] .coca-cola-card__image,
+#menu [data-fanta-variant-card] .fanta-card__image {
+  aspect-ratio: 1 / 1;
+  isolation: isolate;
+}
+
+#menu [data-coca-cola-variant-card] .coca-cola-card__product-image,
+#menu [data-fanta-variant-card] .fanta-card__product-image {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  object-fit: contain;
+  object-position: center;
+  mix-blend-mode: normal;
+  filter: none;
+  pointer-events: none;
+  transform: none;
+  transition: opacity 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#menu [data-coca-cola-variant-card] .coca-cola-card__product-image.is-current,
+#menu [data-fanta-variant-card] .fanta-card__product-image.is-current {
+  opacity: 1;
+}
+
+#menu [data-coca-cola-variant-card]:hover .coca-cola-card__product-image,
+#menu [data-fanta-variant-card]:hover .fanta-card__product-image {
+  filter: none;
+  transform: none;
+}
+
+#menu [data-coca-cola-variant-card],
+#menu [data-fanta-variant-card] {
+  --drink-variant-description-size: 1.55em;
+}
+
+#menu [data-fanta-variant-card] {
+  --drink-variant-description-size: 3.1em;
+}
+
+#menu [data-coca-cola-variant-card] :is([data-coca-cola-description], [data-fanta-description]),
+#menu [data-fanta-variant-card] :is([data-coca-cola-description], [data-fanta-description]) {
+  min-block-size: var(--drink-variant-description-size);
+}
+
+#menu [data-coca-cola-variant-card] .coca-cola-card__variants,
+#menu [data-fanta-variant-card] .fanta-card__variants {
+  min-width: 0;
+  margin: -2px 0 24px;
+  padding: 0;
+  border: 0;
+}
+
+#menu [data-coca-cola-variant-card] .coca-cola-card__variant-options,
+#menu [data-fanta-variant-card] .fanta-card__variant-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+#menu [data-coca-cola-variant-card] .coca-cola-card__variant-option,
+#menu [data-fanta-variant-card] .fanta-card__variant-option {
+  position: relative;
+  display: inline-flex;
+  flex: 1 1 112px;
+  min-width: 0;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border: 1px solid rgba(17, 17, 17, 0.17);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  color: rgba(17, 17, 17, 0.78);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1.1;
+  text-align: center;
+  transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease, color 180ms ease;
+}
+
+#menu [data-coca-cola-variant-card] .coca-cola-card__variant-input,
+#menu [data-fanta-variant-card] .fanta-card__variant-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+#menu [data-coca-cola-variant-card] .coca-cola-card__variant-option.is-active,
+#menu [data-fanta-variant-card] .fanta-card__variant-option.is-active {
+  border-color: #111111;
+  background: #111111;
+  box-shadow: inset 0 0 0 2px #ff5400;
+  color: #ffffff;
+}
+
+#menu [data-coca-cola-variant-card] .coca-cola-card__variant-option.is-active::before,
+#menu [data-fanta-variant-card] .fanta-card__variant-option.is-active::before {
+  width: 6px;
+  height: 6px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: #ff5400;
+  content: "";
+}
+
+#menu [data-coca-cola-variant-card] .coca-cola-card__variant-option:focus-within,
+#menu [data-fanta-variant-card] .fanta-card__variant-option:focus-within {
+  outline: 2px solid #ff5400;
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  #menu [data-coca-cola-variant-card] .coca-cola-card__variant-option:not(.is-active):hover,
+  #menu [data-fanta-variant-card] .fanta-card__variant-option:not(.is-active):hover {
+    border-color: rgba(255, 84, 0, 0.62);
+    background: rgba(255, 84, 0, 0.07);
+    color: #111111;
+  }
+}
+
+@media (max-width: 380px) {
+  #menu [data-coca-cola-variant-card] .coca-cola-card__variant-option,
+  #menu [data-fanta-variant-card] .fanta-card__variant-option {
+    flex-basis: calc(50% - 4px);
+    padding-inline: 8px;
+    font-size: 0.68rem;
+  }
+}
+
+@media (max-width: 767px) {
+  #menu [data-coca-cola-variant-card] {
+    --drink-variant-description-size: 3.1em;
+  }
+
+  #menu [data-fanta-variant-card] {
+    --drink-variant-description-size: 4.65em;
+  }
+}
+
+/* Sprite uses the same drink-card contract with a stable two-option row. */
+#menu [data-sprite-variant-card] {
+  --drink-variant-description-size: 3.1em;
+}
+
+#menu [data-sprite-variant-card] .sprite-card__image {
+  aspect-ratio: 1 / 1;
+  isolation: isolate;
+}
+
+#menu [data-sprite-variant-card] .sprite-card__product-image {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  object-fit: contain;
+  object-position: center;
+  mix-blend-mode: normal;
+  filter: none;
+  pointer-events: none;
+  transform: none;
+  transition: opacity 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#menu [data-sprite-variant-card] .sprite-card__product-image.is-current {
+  opacity: 1;
+}
+
+#menu [data-sprite-variant-card]:hover .sprite-card__product-image {
+  filter: none;
+  transform: none;
+}
+
+#menu [data-sprite-variant-card] [data-sprite-description] {
+  min-block-size: var(--drink-variant-description-size);
+}
+
+#menu [data-sprite-variant-card] .sprite-card__variants {
+  min-width: 0;
+  margin: -2px 0 24px;
+  padding: 0;
+  border: 0;
+}
+
+#menu [data-sprite-variant-card] .sprite-card__variant-options {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+#menu [data-sprite-variant-card] .sprite-card__variant-option {
+  position: relative;
+  display: inline-flex;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border: 1px solid rgba(17, 17, 17, 0.17);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  color: rgba(17, 17, 17, 0.78);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1.1;
+  text-align: center;
+  transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease, color 180ms ease;
+}
+
+#menu [data-sprite-variant-card] .sprite-card__variant-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+#menu [data-sprite-variant-card] .sprite-card__variant-option.is-active {
+  border-color: #111111;
+  background: #111111;
+  box-shadow: inset 0 0 0 2px #ff5400;
+  color: #ffffff;
+}
+
+#menu [data-sprite-variant-card] .sprite-card__variant-option.is-active::before {
+  width: 6px;
+  height: 6px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: #ff5400;
+  content: "";
+}
+
+#menu [data-sprite-variant-card] .sprite-card__variant-option:focus-within {
+  outline: 2px solid #ff5400;
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  #menu [data-sprite-variant-card] .sprite-card__variant-option:not(.is-active):hover {
+    border-color: rgba(255, 84, 0, 0.62);
+    background: rgba(255, 84, 0, 0.07);
+    color: #111111;
+  }
+}
+
+@media (max-width: 380px) {
+  #menu [data-sprite-variant-card] .sprite-card__variant-option {
+    padding-inline: 8px;
+    font-size: 0.68rem;
+  }
+}
+
+@media (max-width: 767px) {
+  #menu [data-sprite-variant-card] {
+    --drink-variant-description-size: 4.65em;
+  }
 }
 
 .location-section {
@@ -4387,7 +4717,7 @@ p {
 
 .menu-panel.is-active .menu-card.is-menu-visible {
   opacity: 1;
-  transform: translate3d(0, var(--card-base-y), 0) scale(1);
+  transform: translateY(var(--card-base-y));
 }
 
 .menu-panel.is-active .menu-card.is-menu-visible:hover {
@@ -4395,7 +4725,7 @@ p {
   box-shadow:
     0 28px 70px rgba(17, 17, 17, 0.115),
     0 24px 62px rgba(251, 95, 5, 0.16);
-  transform: translate3d(0, calc(var(--card-base-y) - 8px), 0) scale(1);
+  transform: translateY(calc(var(--card-base-y) - 8px));
 }
 
 .menu-panel.is-active .burger-card--featured.is-menu-visible:hover {
@@ -5565,6 +5895,13 @@ body.is-loaded .hero__content.is-visible .hero__actions .button:nth-child(2) {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .review-card__star,
+  .review-card:is(.is-active, .is-arriving) .review-card__star {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
   .reviews-visual.reveal,
   .reviews-visual.reveal.is-visible {
     opacity: 1;
@@ -6079,7 +6416,7 @@ h2 {
     --mobile-nav-hit-height: 44px;
     --mobile-nav-menu-width: clamp(77px, 20vw, 78px);
     --mobile-nav-provider-slot: clamp(60px, 15.5vw, 60.45px);
-    --mobile-nav-provider-height: 32px;
+    --mobile-nav-provider-height: clamp(32px, 8vw, 32px);
     --mobile-nav-secondary-width: clamp(52px, 14vw, 54.6px);
     --mobile-nav-wolt-size: clamp(42px, 11vw, 42.9px);
   }
@@ -6460,11 +6797,11 @@ h2 {
   }
 
   h1 {
-    font-size: clamp(2.8rem, 13vw, 50.7px);
+    font-size: clamp(2.8rem, 13vw, 3.55rem);
   }
 
   h2 {
-    font-size: clamp(2.2rem, 10vw, 39px);
+    font-size: clamp(2.2rem, 10vw, 2.85rem);
   }
 
   .hero {
@@ -6632,8 +6969,7 @@ h2 {
 }
 
 .menu-panel.is-active .menu-card.is-menu-visible {
-  backface-visibility: hidden;
-  transform: translate3d(0, var(--card-base-y), 0) scale(1);
+  transform: translateY(var(--card-base-y));
 }
 
 .burger-card__cta {
@@ -7621,7 +7957,7 @@ h2 {
   .hero__actions > .liquid-button.button:hover,
   .hero__actions > .liquid-button.button:active,
   .hero__actions > .liquid-button.button:focus-visible {
-    background: linear-gradient(135deg, #ff5400, #e64800 58%, #ff7a2a);
+    background: linear-gradient(135deg, #ed641c, #d65314 58%, #ef8240);
     box-shadow:
       0 14px 30px rgba(255, 84, 0, 0.26),
       0 5px 12px rgba(17, 17, 17, 0.08);
@@ -7690,20 +8026,4 @@ h2 {
   .cookie-consent { grid-template-columns: 1fr; }
   .cookie-consent__actions, .cookie-settings__actions { justify-content: stretch; }
   .cookie-consent__button { flex: 1 1 130px; }
-}
-
-/* Mobile: avoid compositor-heavy blur and transforms on the scrollable category rail. */
-@media (max-width: 1023px) {
-  #menu .menu-category-navigation.reveal,
-  #menu .menu-category-navigation.reveal.is-visible {
-    transform: none;
-  }
-
-  #menu .menu-category-switcher {
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    background: #fff;
-    scroll-behavior: auto;
-    -webkit-overflow-scrolling: touch;
-  }
 }

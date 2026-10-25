@@ -82,15 +82,12 @@
   }
 
   .reviews-scene::before {
-    top: 8%;
-    right: -18%;
-    bottom: 5%;
-    left: -18%;
-    border-radius: 50%;
+    inset: 0 -8%;
+    border-radius: 0;
     background:
-      radial-gradient(ellipse at 50% 55%, rgba(255, 84, 0, 0.2) 0%, rgba(255, 84, 0, 0.08) 34%, transparent 69%);
-    filter: blur(3px);
-    opacity: 0.9;
+      radial-gradient(ellipse 100% 48% at 50% 28%, rgba(255, 84, 0, 0.1) 0%, rgba(255, 84, 0, 0.052) 30%, rgba(255, 84, 0, 0.018) 49%, transparent 72%);
+    filter: none;
+    opacity: 1;
   }
 
   .reviews-scene::after {
@@ -195,23 +192,27 @@
 
   .review-card::before {
     inset: -8px;
+    box-shadow: none;
+    opacity: 0;
   }
 
   .review-card.is-active {
     z-index: 2;
-    border-color: rgba(255, 84, 0, 0.62);
+    border-color: rgba(255, 84, 0, 0.38);
     box-shadow:
-      0 25px 58px rgba(17, 17, 17, 0.17),
-      0 0 38px rgba(255, 84, 0, 0.2);
+      0 22px 44px rgba(17, 17, 17, 0.15),
+      0 7px 16px rgba(17, 17, 17, 0.065),
+      0 0 18px rgba(255, 84, 0, 0.09);
     opacity: 1;
     transform: none;
   }
 
   .review-card:not(.is-active) {
-    border-color: rgba(255, 84, 0, 0.22);
+    border-color: rgba(255, 84, 0, 0.16);
     box-shadow:
-      0 14px 32px rgba(17, 17, 17, 0.12),
-      0 0 20px rgba(255, 84, 0, 0.1);
+      0 14px 30px rgba(17, 17, 17, 0.11),
+      0 3px 8px rgba(17, 17, 17, 0.04),
+      0 0 12px rgba(255, 84, 0, 0.04);
   }
 
   .review-card:not(.is-active) .review-card__meta,
